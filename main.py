@@ -41,7 +41,7 @@ async def on_ready():
     embed.add_field(name="🖼️ Miniaturka", value="10 PLN", inline=False)
     embed.add_field(name="🎨 Logo", value="20 PLN", inline=False)
     embed.add_field(name="🖌️ Baner", value="20 PLN", inline=False)
-    embed.set_footer(text="Ceny mogą ulec zmianie")
+    embed.set_footer(text="Ceny mogą ulec zmianie (płatność tylko paysafecard)")
 
     await channel.send(embed=embed)
 
@@ -182,3 +182,4 @@ async def timeout(ctx: discord.Interaction, member: discord.Member, minutes: int
 from config import TOKEN
 
 bot.run(TOKEN)
+
