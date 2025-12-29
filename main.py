@@ -28,7 +28,7 @@ CENNIK_GRAFIKA = {
 CENNIK_MONTAZ = {
     "TikTok": "20 PLN",
     "Shorts": "20 PLN",
-    "Film": "50 PLN",
+    "Film": "30 PLN",
 }
 
 # =========================================================
@@ -265,4 +265,5 @@ async def timeout(ctx, member: discord.Member, minutes: int):
 # ======================== START ==========================
 # =========================================================
 bot.run(TOKEN)
+
 
