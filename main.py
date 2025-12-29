@@ -212,6 +212,13 @@ async def setup_cennik(ctx: discord.ApplicationContext):
     for k, v in CENNIK_MONTAZ.items():
         embed.add_field(name=f"🎬 {k}", value=v, inline=False)
 
+        # Dodanie pola informacyjnego o płatności
+    embed.add_field(
+        name="ℹ️ Informacja",
+        value="💳 Płatność tylko Paysafecard",
+        inline=False
+    )
+
     await ctx.channel.send(embed=embed)
     await ctx.respond("✅ Cennik wysłany", ephemeral=True)
 
