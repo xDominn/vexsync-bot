@@ -1,166 +1,212 @@
 import discord
 from discord.ext import commands
-from discord import Option
+from discord import app_commands
 from datetime import timedelta
-from config import *
+from config import TOKEN
 
+# ========= USTAWIENIA =========
 intents = discord.Intents.all()
-bot = commands.Bot(intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
+ZAMOWIENIA_CHANNEL = "︙✉️︙zamówienia︙"
+CENNIK_CHANNEL = "︙💸︙cennik︙"
+OPINIE_CHANNEL = "︙✅︙opinie︙"
+LOG_CHANNEL = "︙📝︙logi︙"
 
+ROLE_CZLONEK = "CZŁONEK"
+ROLE_GRAFIK = "GRAFIK"
+ROLE_MONTAZ = "MONTAŻYSTA"
+ROLE_KLIENT = "KLIENT"
+
+# ========= CENNIK =========
 CENNIK = {
     "Miniaturka": "10 PLN",
     "Logo": "20 PLN",
-    "Baner": "20 PLN"
+    "Baner": "20 PLN",
+    "TikTok": "15 PLN",
+    "Shorts": "15 PLN",
+    "Film": "30 PLN"
 }
 
-# ================= BOT READY =================
+# ========= READY =========
 @bot.event
 async def on_ready():
+    await bot.tree.sync()
     print(f"✅ Zalogowano jako {bot.user}")
 
-# ================= POWITANIE =================
+# ========= AUTO ROLA =========
 @bot.event
 async def on_member_join(member):
-    channel = discord.utils.get(member.guild.text_channels, name=WELCOME_CHANNEL)
-    if channel:
-        embed = discord.Embed(
-            title="👋 Witaj!",
-            description=f"Witaj {member.mention} na **VexSync**!",
-            color=discord.Color.green()
-        )
-        await channel.send(embed=embed)
-
-    role = discord.utils.get(member.guild.roles, name=NOWA_ROLA)
+    role = discord.utils.get(member.guild.roles, name=ROLE_CZLONEK)
     if role:
         await member.add_roles(role)
 
-# ================= MODAL =================
+# ========= MODAL =========
 class ZamowienieModal(discord.ui.Modal):
-    def __init__(self, typ):
-        super().__init__(title=f"Zamówienie: {typ}")
+    def __init__(self, dzial, typ):
+        super().__init__(title=f"Zamówienie – {typ}")
+        self.dzial = dzial
         self.typ = typ
-        self.opis = discord.ui.InputText(
+
+        self.opis = discord.ui.TextInput(
             label="Opis zamówienia",
-            style=discord.InputTextStyle.long,
-            placeholder="Opisz szczegóły zamówienia"
+            style=discord.TextStyle.long,
+            required=True,
+            placeholder="Opisz dokładnie czego potrzebujesz"
         )
         self.add_item(self.opis)
 
-    async def callback(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction):
         guild = interaction.guild
 
-        category = discord.utils.get(guild.categories, name=ZAMOWIENIA_CATEGORY)
+        # role
+        await interaction.user.add_roles(
+            discord.utils.get(guild.roles, name=ROLE_KLIENT)
+        )
+
+        # kanał
+        category = discord.utils.get(guild.categories, name="ZAMÓWIENIA")
         if not category:
-            category = await guild.create_category(ZAMOWIENIA_CATEGORY)
+            category = await guild.create_category("ZAMÓWIENIA")
 
         channel = await guild.create_text_channel(
-            f"🟡・zamowienie-{interaction.user.name}",
+            f"zamowienie-{interaction.user.name}",
             category=category
         )
 
-        grafik_role = discord.utils.get(guild.roles, name=GRAFIK_ROLE)
+        ping_role = ROLE_GRAFIK if self.dzial == "Grafika" else ROLE_MONTAZ
+        role = discord.utils.get(guild.roles, name=ping_role)
 
-        embed = discord.Embed(title="📦 Nowe zamówienie", color=discord.Color.orange())
-        embed.add_field(name="Klient", value=interaction.user.mention, inline=False)
-        embed.add_field(name="Typ", value=self.typ, inline=False)
-        embed.add_field(name="Cena", value=CENNIK[self.typ], inline=False)
+        embed = discord.Embed(
+            title="📦 Nowe zamówienie",
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="Klient", value=interaction.user.mention)
+        embed.add_field(name="Dział", value=self.dzial)
+        embed.add_field(name="Typ", value=self.typ)
+        embed.add_field(name="Cena", value=CENNIK.get(self.typ))
         embed.add_field(name="Opis", value=self.opis.value, inline=False)
 
         await channel.send(
-            content=grafik_role.mention if grafik_role else None,
+            content=role.mention if role else None,
             embed=embed
         )
 
-        await interaction.response.send_message("✅ Zamówienie utworzone!", ephemeral=True)
+        await interaction.response.send_message(
+            "✅ Zamówienie utworzone!",
+            ephemeral=True
+        )
 
-# ================= PRZYCISK =================
+# ========= WYBÓR TYPU =========
+class TypView(discord.ui.View):
+    def __init__(self, dzial):
+        super().__init__(timeout=None)
+        self.dzial = dzial
+
+        if dzial == "Grafika":
+            self.add_item(TypButton("Miniaturka", dzial))
+            self.add_item(TypButton("Logo", dzial))
+            self.add_item(TypButton("Baner", dzial))
+        else:
+            self.add_item(TypButton("TikTok", dzial))
+            self.add_item(TypButton("Shorts", dzial))
+            self.add_item(TypButton("Film", dzial))
+
+class TypButton(discord.ui.Button):
+    def __init__(self, label, dzial):
+        super().__init__(label=label, style=discord.ButtonStyle.primary)
+        self.typ = label
+        self.dzial = dzial
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            ZamowienieModal(self.dzial, self.typ)
+        )
+
+# ========= WYBÓR DZIAŁU =========
 class ZamowienieView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="📦 Złóż zamówienie", style=discord.ButtonStyle.primary)
-    async def zamowienie(self, button, interaction):
+    @discord.ui.button(label="🎨 Grafika", style=discord.ButtonStyle.success)
+    async def grafika(self, interaction: discord.Interaction, _):
         await interaction.response.send_message(
-            "Wybierz typ zamówienia:",
-            view=TypView(),
+            "Wybierz typ grafiki:",
+            view=TypView("Grafika"),
             ephemeral=True
         )
 
-class TypView(discord.ui.View):
-    @discord.ui.select(
-        placeholder="Wybierz typ",
-        options=[
-            discord.SelectOption(label="Miniaturka"),
-            discord.SelectOption(label="Logo"),
-            discord.SelectOption(label="Baner"),
-        ]
-    )
-    async def select(self, select, interaction):
-        await interaction.response.send_modal(ZamowienieModal(select.values[0]))
+    @discord.ui.button(label="🎬 Montaż", style=discord.ButtonStyle.primary)
+    async def montaz(self, interaction: discord.Interaction, _):
+        await interaction.response.send_message(
+            "Wybierz typ montażu:",
+            view=TypView("Montaż"),
+            ephemeral=True
+        )
 
-# ================= KOMENDA ADMIN – ZAMÓWIENIA =================
-@bot.slash_command(name="zamowienia_setup", description="Wyślij panel zamówień")
-@commands.has_permissions(administrator=True)
-async def zamowienia_setup(ctx):
-    channel = discord.utils.get(ctx.guild.text_channels, name=ZAMOWIENIA_CHANNEL)
-    if not channel:
-        return await ctx.respond("❌ Brak kanału zamówień", ephemeral=True)
-
+# ========= KOMENDA ADMIN – ZAMÓWIENIA =========
+@bot.tree.command(name="wyslij_zamowienia")
+@app_commands.checks.has_permissions(administrator=True)
+async def wyslij_zamowienia(interaction: discord.Interaction):
+    channel = discord.utils.get(interaction.guild.text_channels, name=ZAMOWIENIA_CHANNEL)
     embed = discord.Embed(
         title="📦 Zamówienia",
-        description="Kliknij przycisk, aby złożyć zamówienie",
-        color=discord.Color.blurple()
+        description="Kliknij przycisk aby złożyć zamówienie",
+        color=discord.Color.green()
     )
     await channel.send(embed=embed, view=ZamowienieView())
-    await ctx.respond("✅ Panel zamówień wysłany", ephemeral=True)
+    await interaction.response.send_message("✅ Wysłano", ephemeral=True)
 
-# ================= KOMENDA ADMIN – CENNIK =================
-@bot.slash_command(name="cennik", description="Wyślij cennik")
-@commands.has_permissions(administrator=True)
-async def cennik(ctx):
-    channel = discord.utils.get(ctx.guild.text_channels, name=CENNIK_CHANNEL)
-    if not channel:
-        return await ctx.respond("❌ Brak kanału cennik", ephemeral=True)
+# ========= KOMENDA ADMIN – CENNIK =========
+@bot.tree.command(name="wyslij_cennik")
+@app_commands.checks.has_permissions(administrator=True)
+async def wyslij_cennik(interaction: discord.Interaction):
+    channel = discord.utils.get(interaction.guild.text_channels, name=CENNIK_CHANNEL)
 
-    embed = discord.Embed(title="💰 Cennik – VexSync", color=discord.Color.blue())
+    embed = discord.Embed(
+        title="💰 Cennik usług",
+        color=discord.Color.blue()
+    )
     for k, v in CENNIK.items():
         embed.add_field(name=k, value=v, inline=False)
 
     await channel.send(embed=embed)
-    await ctx.respond("✅ Cennik wysłany", ephemeral=True)
+    await interaction.response.send_message("✅ Cennik wysłany", ephemeral=True)
 
-# ================= OPINIA =================
-@bot.slash_command(name="opinia", description="Dodaj opinię")
-async def opinia(ctx, tekst: Option(str, "Twoja opinia")):
-    channel = discord.utils.get(ctx.guild.text_channels, name=OPINIE_CHANNEL)
-    embed = discord.Embed(title="⭐ Opinia", description=tekst, color=discord.Color.gold())
-    embed.set_footer(text=f"{ctx.author}")
+# ========= OPINIA =========
+@bot.tree.command(name="opinia")
+async def opinia(interaction: discord.Interaction, dzial: str, tresc: str):
+    channel = discord.utils.get(interaction.guild.text_channels, name=OPINIE_CHANNEL)
+
+    embed = discord.Embed(
+        title="⭐ Opinia",
+        description=tresc,
+        color=discord.Color.gold()
+    )
+    embed.set_footer(text=f"{dzial} | {interaction.user}")
+
     await channel.send(embed=embed)
-    await ctx.respond("✅ Opinia dodana", ephemeral=True)
+    await interaction.response.send_message("✅ Dodano opinię", ephemeral=True)
 
-# ================= MODERACJA =================
-@bot.slash_command(name="ban")
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, reason: str = "Brak powodu"):
+# ========= MODERACJA =========
+@bot.tree.command(name="ban")
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Brak powodu"):
     await member.ban(reason=reason)
-    await ctx.respond("🔨 Zbanowano")
+    await interaction.response.send_message("🔨 Zbanowano")
 
-@bot.slash_command(name="kick")
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, reason: str = "Brak powodu"):
-    await member.kick(reason=reason)
-    await ctx.respond("👢 Wyrzucono")
+@bot.tree.command(name="kick")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction: discord.Interaction, member: discord.Member):
+    await member.kick()
+    await interaction.response.send_message("👢 Wyrzucono")
 
-@bot.slash_command(name="timeout")
-@commands.has_permissions(moderate_members=True)
-async def timeout(ctx, member: discord.Member, minutes: int):
+@bot.tree.command(name="timeout")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def timeout(interaction: discord.Interaction, member: discord.Member, minutes: int):
     until = discord.utils.utcnow() + timedelta(minutes=minutes)
     await member.timeout(until)
-    await ctx.respond("⏱️ Timeout nadany")
+    await interaction.response.send_message("⏱️ Timeout nadany")
 
-# ================= START =================
+# ========= START =========
 bot.run(TOKEN)
-
-
