@@ -6,20 +6,18 @@ from datetime import timedelta
 from config import (
     TOKEN,
     WELCOME_CHANNEL,
-    LOG_CHANNEL,
     KLIENT_ROLE,
     GRAFIK_ROLE,
     MONTAZ_ROLE
 )
 
-# ====== USTAWIENIA ======
 intents = discord.Intents.all()
 bot = commands.Bot(intents=intents)
 
 ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
 NOWA_ROLA = "CZŁONEK"
 
-# ====== CENNIK ======
+# ===== CENNIK =====
 CENNIK_GRAFIKA = {
     "Miniaturka": "10 PLN",
     "Logo": "20 PLN",
@@ -88,8 +86,11 @@ class ZamowienieModal(discord.ui.Modal):
         if not category:
             category = await guild.create_category(ZAMOWIENIA_CATEGORY)
 
-        # role
         klient_role = discord.utils.get(guild.roles, name=KLIENT_ROLE)
+
+        # 🔹 Nadaj rolę KLIENT automatycznie
+        if klient_role and klient_role not in interaction.user.roles:
+            await interaction.user.add_roles(klient_role)
 
         if self.dzial == "Grafika":
             cena = CENNIK_GRAFIKA[self.typ]
@@ -98,33 +99,23 @@ class ZamowienieModal(discord.ui.Modal):
             cena = CENNIK_MONTAZ[self.typ]
             worker_role = discord.utils.get(guild.roles, name=MONTAZ_ROLE)
 
-        # uprawnienia
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
         }
-
-        if worker_role:
-            overwrites[worker_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
         if klient_role:
             overwrites[klient_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-        # tworzenie kanału
+        if worker_role:
+            overwrites[worker_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
         channel = await guild.create_text_channel(
             f"🟡・zamowienie-{interaction.user.name}",
             category=category,
             overwrites=overwrites
         )
 
-        # wymuszenie permisji (discord czasem ignoruje przy kategorii)
-        if klient_role:
-            await channel.set_permissions(klient_role, view_channel=True, send_messages=True)
-
-        if worker_role:
-            await channel.set_permissions(worker_role, view_channel=True, send_messages=True)
-
-        # embed
         embed = discord.Embed(
             title="📦 Nowe zamówienie",
             color=discord.Color.orange()
@@ -144,7 +135,7 @@ class ZamowienieModal(discord.ui.Modal):
         )
 
 # =========================================================
-# PRZYCISKI ZAMÓWIENIA
+# PRZYCISKI
 # =========================================================
 class ZamowienieButtons(discord.ui.View):
 
@@ -239,7 +230,7 @@ class MontazView(discord.ui.View):
         )
 
 # =========================================================
-# SETUP PANELU ZAMÓWIEŃ
+# SETUP PANELU
 # =========================================================
 @bot.slash_command(description="SETUP: panel zamówień")
 @commands.has_permissions(administrator=True)
@@ -251,17 +242,11 @@ async def setup_zamowienia(ctx: discord.ApplicationContext):
         color=discord.Color.blurple()
     )
 
-    await ctx.channel.send(
-        embed=embed,
-        view=StartZamowienia()
-    )
+    await ctx.channel.send(embed=embed, view=StartZamowienia())
 
-    await ctx.respond(
-        "✅ Panel zamówień wysłany",
-        ephemeral=True
-    )
+    await ctx.respond("✅ Panel zamówień wysłany", ephemeral=True)
 
 # =========================================================
-# START BOTA
+# START
 # =========================================================
 bot.run(TOKEN)
