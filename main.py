@@ -237,7 +237,7 @@ async def setup_zamowienia(ctx: discord.ApplicationContext):
 @commands.has_permissions(manage_messages=True)
 async def purge(
     ctx: discord.ApplicationContext,
-    liczba: int = Option(int, "Ile wiadomości usunąć? (max 100)", min_value=1, max_value=100)
+    liczba: Option(int, "Ile wiadomości usunąć? (max 100)", min_value=1, max_value=100)
 ):
     deleted = await ctx.channel.purge(limit=liczba)
     await ctx.respond(f"✅ Usunięto {len(deleted)} wiadomości.", ephemeral=True)
