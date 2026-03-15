@@ -9,8 +9,7 @@ from config import (
     LOG_CHANNEL,
     KLIENT_ROLE,
     GRAFIK_ROLE,
-    MONTAZ_ROLE,
-    NOWA_ROLA
+    MONTAZ_ROLE
 )
 
 # ====== USTAWIENIA ======
@@ -18,6 +17,7 @@ intents = discord.Intents.all()
 bot = commands.Bot(intents=intents)
 
 ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
+NOWA_ROLA = "CZŁONEK"
 
 # ====== CENNIK ======
 CENNIK_GRAFIKA = {
@@ -65,6 +65,7 @@ class ZamowienieModal(discord.ui.Modal):
         super().__init__(title="Opis zamówienia")
         self.dzial = dzial
         self.typ = typ
+
         self.opis = discord.ui.InputText(
             label="Opisz szczegóły zamówienia",
             style=discord.InputTextStyle.long
@@ -74,16 +75,17 @@ class ZamowienieModal(discord.ui.Modal):
     async def callback(self, interaction: discord.Interaction):
         guild = interaction.guild
 
-        # Pobranie kategorii
+        # nadaj rolę KLIENT, jeśli użytkownik jej nie ma
+        klient_role = discord.utils.get(guild.roles, name=KLIENT_ROLE)
+        if klient_role and klient_role not in interaction.user.roles:
+            await interaction.user.add_roles(klient_role)
+
+        # przygotowanie kategorii
         category = discord.utils.get(guild.categories, name=ZAMOWIENIA_CATEGORY)
         if not category:
             category = await guild.create_category(ZAMOWIENIA_CATEGORY)
 
-        # Role
-        klient_role = discord.utils.get(guild.roles, name=KLIENT_ROLE)
-        if not klient_role:
-            klient_role = await guild.create_role(name=KLIENT_ROLE)
-
+        # role działu
         if self.dzial == "Grafika":
             cena = CENNIK_GRAFIKA[self.typ]
             worker_role = discord.utils.get(guild.roles, name=GRAFIK_ROLE)
@@ -91,34 +93,30 @@ class ZamowienieModal(discord.ui.Modal):
             cena = CENNIK_MONTAZ[self.typ]
             worker_role = discord.utils.get(guild.roles, name=MONTAZ_ROLE)
 
-        # Dodanie roli KLIENT do użytkownika
-        if klient_role not in interaction.user.roles:
-            await interaction.user.add_roles(klient_role)
-
-        # Uprawnienia do kanału
+        # uprawnienia do kanału
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
         if worker_role:
             overwrites[worker_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
         if klient_role:
             overwrites[klient_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-        # Tworzenie prywatnego kanału
+        # tworzenie kanału
         channel = await guild.create_text_channel(
             f"🟡・zamowienie-{interaction.user.name}",
             category=category,
             overwrites=overwrites
         )
 
-        # Wymuszenie permisji (czasem Discord ignoruje przy kategorii)
-        if klient_role:
-            await channel.set_permissions(klient_role, view_channel=True, send_messages=True)
+        # wymuszenie permisji
         if worker_role:
             await channel.set_permissions(worker_role, view_channel=True, send_messages=True)
+        if klient_role:
+            await channel.set_permissions(klient_role, view_channel=True, send_messages=True)
 
-        # Embed zamówienia
+        # embed zamówienia
         embed = discord.Embed(
             title="📦 Nowe zamówienie",
             color=discord.Color.orange()
@@ -130,7 +128,11 @@ class ZamowienieModal(discord.ui.Modal):
         embed.add_field(name="Opis", value=self.opis.value, inline=False)
 
         await channel.send(embed=embed, view=ZamowienieButtons())
-        await interaction.response.send_message("✅ Zamówienie utworzone!", ephemeral=True)
+
+        await interaction.response.send_message(
+            "✅ Zamówienie utworzone!",
+            ephemeral=True
+        )
 
 # =========================================================
 # PRZYCISKI ZAMÓWIENIA
@@ -142,7 +144,10 @@ class ZamowienieButtons(discord.ui.View):
     @discord.ui.button(label="🟢 Gotowe", style=discord.ButtonStyle.success)
     async def done(self, button, interaction):
         await interaction.channel.edit(name=f"🟢・{interaction.channel.name}")
-        await interaction.response.send_message("✅ Oznaczono jako gotowe", ephemeral=True)
+        await interaction.response.send_message(
+            "✅ Oznaczono jako gotowe",
+            ephemeral=True
+        )
 
     @discord.ui.button(label="🔒 Zamknij", style=discord.ButtonStyle.danger)
     async def close(self, button, interaction):
@@ -157,11 +162,19 @@ class StartZamowienia(discord.ui.View):
 
     @discord.ui.button(label="🎨 Grafika", style=discord.ButtonStyle.primary)
     async def grafika(self, button, interaction):
-        await interaction.response.send_message("Wybierz typ grafiki:", view=GrafikaView(), ephemeral=True)
+        await interaction.response.send_message(
+            "Wybierz typ grafiki:",
+            view=GrafikaView(),
+            ephemeral=True
+        )
 
     @discord.ui.button(label="🎬 Montaż", style=discord.ButtonStyle.secondary)
     async def montaz(self, button, interaction):
-        await interaction.response.send_message("Wybierz typ montażu:", view=MontazView(), ephemeral=True)
+        await interaction.response.send_message(
+            "Wybierz typ montażu:",
+            view=MontazView(),
+            ephemeral=True
+        )
 
 # =========================================================
 # GRAFIKA VIEW
@@ -179,7 +192,9 @@ class GrafikaView(discord.ui.View):
         ]
     )
     async def select(self, select, interaction):
-        await interaction.response.send_modal(ZamowienieModal("Grafika", select.values[0]))
+        await interaction.response.send_modal(
+            ZamowienieModal("Grafika", select.values[0])
+        )
 
 # =========================================================
 # MONTAŻ VIEW
@@ -197,7 +212,9 @@ class MontazView(discord.ui.View):
         ]
     )
     async def select(self, select, interaction):
-        await interaction.response.send_modal(ZamowienieModal("Montaż", select.values[0]))
+        await interaction.response.send_modal(
+            ZamowienieModal("Montaż", select.values[0])
+        )
 
 # =========================================================
 # SETUP PANELU ZAMÓWIEŃ
@@ -214,13 +231,15 @@ async def setup_zamowienia(ctx: discord.ApplicationContext):
     await ctx.respond("✅ Panel zamówień wysłany", ephemeral=True)
 
 # =========================================================
-# PURGE / CZYSZCZENIE WIADOMOŚCI
+# KOMENDA PURGE (USUWANIE WIADOMOŚCI)
 # =========================================================
-@bot.slash_command(description="🧹 Wyczyść wiadomości z kanału")
-@commands.has_permissions(administrator=True)
-async def purge(ctx: discord.ApplicationContext, ilosc: Option(int, "Ile wiadomości usunąć? (max 100)", min_value=1, max_value=100)):
-    await ctx.defer(ephemeral=True)
-    deleted = await ctx.channel.purge(limit=ilosc)
+@bot.slash_command(description="Usuń wiadomości z kanału (max 100)")
+@commands.has_permissions(manage_messages=True)
+async def purge(
+    ctx: discord.ApplicationContext,
+    liczba: int = Option(int, "Ile wiadomości usunąć? (max 100)", min_value=1, max_value=100)
+):
+    deleted = await ctx.channel.purge(limit=liczba)
     await ctx.respond(f"✅ Usunięto {len(deleted)} wiadomości.", ephemeral=True)
 
 # =========================================================
