@@ -33,17 +33,18 @@ CENNIK_MONTAZ = {
 }
 
 # =========================================================
-# ======================= BOT READY =======================
+# BOT READY
 # =========================================================
 @bot.event
 async def on_ready():
     print(f"✅ Zalogowano jako {bot.user}")
 
 # =========================================================
-# ====================== POWITANIE ========================
+# POWITANIE
 # =========================================================
 @bot.event
 async def on_member_join(member):
+
     channel = discord.utils.get(member.guild.text_channels, name=WELCOME_CHANNEL)
 
     if channel:
@@ -52,14 +53,16 @@ async def on_member_join(member):
             description=f"Witaj {member.mention} na **VexSync**!",
             color=discord.Color.green()
         )
+
         await channel.send(embed=embed)
 
     role = discord.utils.get(member.guild.roles, name=NOWA_ROLA)
+
     if role:
         await member.add_roles(role)
 
 # =========================================================
-# ===================== MODAL OPIS ========================
+# MODAL ZAMÓWIENIA
 # =========================================================
 class ZamowienieModal(discord.ui.Modal):
 
@@ -85,7 +88,7 @@ class ZamowienieModal(discord.ui.Modal):
         if not category:
             category = await guild.create_category(ZAMOWIENIA_CATEGORY)
 
-        # ROLE
+        # role
         klient_role = discord.utils.get(guild.roles, name=KLIENT_ROLE)
 
         if self.dzial == "Grafika":
@@ -95,25 +98,33 @@ class ZamowienieModal(discord.ui.Modal):
             cena = CENNIK_MONTAZ[self.typ]
             worker_role = discord.utils.get(guild.roles, name=MONTAZ_ROLE)
 
-        # PERMISJE
+        # uprawnienia
         overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
         }
 
-        if klient_role:
-            overwrites[klient_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
-
         if worker_role:
-            overwrites[worker_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            overwrites[worker_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-        # TWORZENIE KANAŁU
+        if klient_role:
+            overwrites[klient_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+
+        # tworzenie kanału
         channel = await guild.create_text_channel(
             f"🟡・zamowienie-{interaction.user.name}",
             category=category,
             overwrites=overwrites
         )
 
+        # wymuszenie permisji (discord czasem ignoruje przy kategorii)
+        if klient_role:
+            await channel.set_permissions(klient_role, view_channel=True, send_messages=True)
+
+        if worker_role:
+            await channel.set_permissions(worker_role, view_channel=True, send_messages=True)
+
+        # embed
         embed = discord.Embed(
             title="📦 Nowe zamówienie",
             color=discord.Color.orange()
@@ -133,7 +144,7 @@ class ZamowienieModal(discord.ui.Modal):
         )
 
 # =========================================================
-# ===================== PRZYCISKI =========================
+# PRZYCISKI ZAMÓWIENIA
 # =========================================================
 class ZamowienieButtons(discord.ui.View):
 
@@ -143,7 +154,9 @@ class ZamowienieButtons(discord.ui.View):
     @discord.ui.button(label="🟢 Gotowe", style=discord.ButtonStyle.success)
     async def done(self, button, interaction):
 
-        await interaction.channel.edit(name=f"🟢・{interaction.channel.name}")
+        await interaction.channel.edit(
+            name=f"🟢・{interaction.channel.name}"
+        )
 
         await interaction.response.send_message(
             "✅ Oznaczono jako gotowe",
@@ -156,7 +169,7 @@ class ZamowienieButtons(discord.ui.View):
         await interaction.channel.delete()
 
 # =========================================================
-# ================== WYBÓR DZIAŁU =========================
+# WYBÓR DZIAŁU
 # =========================================================
 class StartZamowienia(discord.ui.View):
 
@@ -182,7 +195,7 @@ class StartZamowienia(discord.ui.View):
         )
 
 # =========================================================
-# =================== GRAFIKA VIEW ========================
+# GRAFIKA VIEW
 # =========================================================
 class GrafikaView(discord.ui.View):
 
@@ -204,7 +217,7 @@ class GrafikaView(discord.ui.View):
         )
 
 # =========================================================
-# =================== MONTAŻ VIEW =========================
+# MONTAŻ VIEW
 # =========================================================
 class MontazView(discord.ui.View):
 
@@ -226,7 +239,7 @@ class MontazView(discord.ui.View):
         )
 
 # =========================================================
-# ================== SETUP ZAMÓWIEŃ =======================
+# SETUP PANELU ZAMÓWIEŃ
 # =========================================================
 @bot.slash_command(description="SETUP: panel zamówień")
 @commands.has_permissions(administrator=True)
@@ -238,7 +251,10 @@ async def setup_zamowienia(ctx: discord.ApplicationContext):
         color=discord.Color.blurple()
     )
 
-    await ctx.channel.send(embed=embed, view=StartZamowienia())
+    await ctx.channel.send(
+        embed=embed,
+        view=StartZamowienia()
+    )
 
     await ctx.respond(
         "✅ Panel zamówień wysłany",
@@ -246,6 +262,6 @@ async def setup_zamowienia(ctx: discord.ApplicationContext):
     )
 
 # =========================================================
-# ======================== START ==========================
+# START BOTA
 # =========================================================
 bot.run(TOKEN)
