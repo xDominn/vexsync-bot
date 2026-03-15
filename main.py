@@ -216,6 +216,8 @@ class MontazView(discord.ui.View):
             ZamowienieModal("Montaż", select.values[0])
         )
 
+GUILD_ID = 1453411007010439168  # Twój serwer
+
 # =========================================================
 # SETUP PANELU ZAMÓWIEŃ
 # =========================================================
