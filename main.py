@@ -238,9 +238,56 @@ async def unban(ctx: discord.ApplicationContext, user_id: Option(int, "ID użytk
 
 @bot.slash_command(guild_ids=[GUILD_ID], description="Mute (timeout) użytkownika w sekundach")
 @commands.has_permissions(moderate_members=True)
-async def mute(ctx: discord.ApplicationContext, user: Option(discord.Member, "Użytkownik do wyciszenia"), czas: Option(int, "Czas w sekundach", min_value=1, max_value=2419200)):  # max 28 dni
+async def mute(ctx: discord.ApplicationContext, user: Option(discord.Member, "Użytkownik do wyciszenia"), czas: Option(int, "Czas w sekundach", min_value=1, max_value=2419200)):
     await user.edit(timed_out_until=discord.utils.utcnow() + timedelta(seconds=czas))
     await ctx.respond(f"✅ {user.mention} wyciszony na {czas} sekund.", ephemeral=True)
+
+# =========================================================
+# SYSTEM WARNÓW
+# =========================================================
+warns = {}  # {user_id: [{"reason": "...", "moderator": "..."}]}
+
+@bot.slash_command(guild_ids=[GUILD_ID], description="Ostrzeż użytkownika")
+@commands.has_permissions(kick_members=True)
+async def warn(
+    ctx: discord.ApplicationContext,
+    user: Option(discord.Member, "Użytkownik do ostrzeżenia"),
+    reason: Option(str, "Powód", required=False)
+):
+    reason_text = reason if reason else "Brak powodu"
+    if user.id not in warns:
+        warns[user.id] = []
+    warns[user.id].append({"reason": reason_text, "moderator": ctx.user.name})
+
+    # Log do LOG_CHANNEL
+    log_channel = discord.utils.get(ctx.guild.text_channels, name=LOG_CHANNEL)
+    if log_channel:
+        embed = discord.Embed(title="⚠️ Ostrzeżenie", color=discord.Color.orange())
+        embed.add_field(name="Użytkownik", value=user.mention, inline=False)
+        embed.add_field(name="Ostrzegający", value=ctx.user.mention, inline=False)
+        embed.add_field(name="Powód", value=reason_text, inline=False)
+        await log_channel.send(embed=embed)
+
+    await ctx.respond(f"⚠️ {user.mention} został ostrzeżony. Powód: {reason_text}", ephemeral=True)
+
+@bot.slash_command(guild_ids=[GUILD_ID], description="Pokaż warny użytkownika")
+@commands.has_permissions(administrator=True)
+async def warns_user(
+    ctx: discord.ApplicationContext,
+    user: Option(discord.Member, "Użytkownik do sprawdzenia")
+):
+    if user.id not in warns or len(warns[user.id]) == 0:
+        await ctx.respond(f"✅ {user.mention} nie ma żadnych warnów.", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title=f"⚠️ Warny użytkownika {user.display_name}",
+        color=discord.Color.orange()
+    )
+    for i, w in enumerate(warns[user.id], start=1):
+        embed.add_field(name=f"Warn #{i}", value=f"Powód: {w['reason']}\nModerator: {w['moderator']}", inline=False)
+
+    await ctx.respond(embed=embed, ephemeral=True)
 
 # =========================================================
 # START BOTA
