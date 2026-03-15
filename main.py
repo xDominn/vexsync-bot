@@ -249,11 +249,7 @@ warns = {}  # {user_id: [{"reason": "...", "moderator": "..."}]}
 
 @bot.slash_command(guild_ids=[GUILD_ID], description="Ostrzeż użytkownika")
 @commands.has_permissions(kick_members=True)
-async def warn(
-    ctx: discord.ApplicationContext,
-    user: Option(discord.Member, "Użytkownik do ostrzeżenia"),
-    reason: Option(str, "Powód", required=False)
-):
+async def warn(ctx: discord.ApplicationContext, user: Option(discord.Member, "Użytkownik do ostrzeżenia"), reason: Option(str, "Powód", required=False)):
     reason_text = reason if reason else "Brak powodu"
     if user.id not in warns:
         warns[user.id] = []
@@ -272,22 +268,34 @@ async def warn(
 
 @bot.slash_command(guild_ids=[GUILD_ID], description="Pokaż warny użytkownika")
 @commands.has_permissions(administrator=True)
-async def warns_user(
-    ctx: discord.ApplicationContext,
-    user: Option(discord.Member, "Użytkownik do sprawdzenia")
-):
+async def warns_user(ctx: discord.ApplicationContext, user: Option(discord.Member, "Użytkownik do sprawdzenia")):
     if user.id not in warns or len(warns[user.id]) == 0:
         await ctx.respond(f"✅ {user.mention} nie ma żadnych warnów.", ephemeral=True)
         return
 
-    embed = discord.Embed(
-        title=f"⚠️ Warny użytkownika {user.display_name}",
-        color=discord.Color.orange()
-    )
+    embed = discord.Embed(title=f"⚠️ Warny użytkownika {user.display_name}", color=discord.Color.orange())
     for i, w in enumerate(warns[user.id], start=1):
         embed.add_field(name=f"Warn #{i}", value=f"Powód: {w['reason']}\nModerator: {w['moderator']}", inline=False)
 
     await ctx.respond(embed=embed, ephemeral=True)
+
+@bot.slash_command(guild_ids=[GUILD_ID], description="Usuń warn użytkownika")
+@commands.has_permissions(kick_members=True)
+async def unwarn(ctx: discord.ApplicationContext, user: Option(discord.Member, "Użytkownik, którego warny chcesz usunąć"), numer: Option(int, "Numer warna do usunięcia (opcjonalnie)", required=False)):
+    if user.id not in warns or len(warns[user.id]) == 0:
+        await ctx.respond(f"✅ {user.mention} nie ma żadnych warnów.", ephemeral=True)
+        return
+
+    if numer is None:
+        count = len(warns[user.id])
+        warns[user.id] = []
+        await ctx.respond(f"✅ Usunięto wszystkie {count} warny użytkownika {user.mention}.", ephemeral=True)
+    else:
+        if numer < 1 or numer > len(warns[user.id]):
+            await ctx.respond(f"❌ Nie ma warna o numerze {numer}.", ephemeral=True)
+            return
+        removed = warns[user.id].pop(numer - 1)
+        await ctx.respond(f"✅ Usunięto warna #{numer} użytkownika {user.mention} (Powód: {removed['reason']}).", ephemeral=True)
 
 # =========================================================
 # START BOTA
