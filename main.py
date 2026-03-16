@@ -303,6 +303,8 @@ import re
 from datetime import datetime, timedelta
 
 giveaways = {}
+giveaway_counter = 0
+
 
 def parse_time(time_str):
     time_regex = re.compile(r"(\d+)([smhd])")
@@ -310,7 +312,9 @@ def parse_time(time_str):
 
     seconds = 0
     for value, unit in matches:
+
         value = int(value)
+
         if unit == "s":
             seconds += value
         elif unit == "m":
@@ -319,26 +323,43 @@ def parse_time(time_str):
             seconds += value * 3600
         elif unit == "d":
             seconds += value * 86400
+
     return seconds
 
 
 class GiveawayJoin(discord.ui.View):
 
-    def __init__(self, message_id):
+    def __init__(self, gw_id):
         super().__init__(timeout=None)
-        self.message_id = message_id
+        self.gw_id = gw_id
 
     @discord.ui.button(label="🎉 Join Giveaway", style=discord.ButtonStyle.green)
     async def join(self, button, interaction):
 
-        if interaction.user.id in giveaways[self.message_id]["users"]:
+        data = giveaways[self.gw_id]
+
+        if data["ended"]:
             await interaction.response.send_message(
-                "❌ Już bierzesz udział w giveaway!",
+                "❌ Giveaway zakończony.",
                 ephemeral=True
             )
             return
 
-        giveaways[self.message_id]["users"].append(interaction.user.id)
+        if interaction.user.id in data["users"]:
+            await interaction.response.send_message(
+                "❌ Już bierzesz udział!",
+                ephemeral=True
+            )
+            return
+
+        data["users"].append(interaction.user.id)
+
+        message = await interaction.channel.fetch_message(data["message"])
+
+        embed = message.embeds[0]
+        embed.set_footer(text=f"Uczestnicy: {len(data['users'])}")
+
+        await message.edit(embed=embed)
 
         await interaction.response.send_message(
             "🎉 Dołączyłeś do giveaway!",
@@ -351,74 +372,121 @@ class GiveawayJoin(discord.ui.View):
 async def giveaway_start(
     ctx: discord.ApplicationContext,
     nagroda: Option(str, "Nagroda"),
-    czas: Option(str, "Czas np. 10m / 1h / 1h30m"),
+    zwyciezcy: Option(int, "Ilu zwycięzców"),
+    czas: Option(str, "Czas np 10m / 1h / 1h30m"),
     opis: Option(str, "Opis giveaway")
 ):
 
+    global giveaway_counter
+
     seconds = parse_time(czas)
+    giveaway_counter += 1
+
+    gw_id = f"GW-{giveaway_counter}"
 
     end_time = datetime.utcnow() + timedelta(seconds=seconds)
 
     embed = discord.Embed(
         title="🎉 GIVEAWAY 🎉",
-        description=f"{opis}",
+        description=opis,
         color=discord.Color.gold()
     )
 
-    embed.add_field(name="🏆 Nagroda", value=nagroda, inline=False)
+    embed.add_field(name="🎁 Nagroda", value=nagroda)
+    embed.add_field(name="🏆 Zwycięzcy", value=zwyciezcy)
+    embed.add_field(name="🆔 ID", value=gw_id)
     embed.add_field(name="⏳ Koniec", value=f"<t:{int(end_time.timestamp())}:R>")
-    embed.set_footer(text=f"Host: {ctx.user}")
+
+    embed.set_footer(text="Uczestnicy: 0")
 
     message = await ctx.channel.send(embed=embed)
 
-    giveaways[message.id] = {
+    giveaways[gw_id] = {
         "reward": nagroda,
         "users": [],
         "ended": False,
-        "channel": ctx.channel.id
+        "message": message.id,
+        "channel": ctx.channel.id,
+        "winners": zwyciezcy
     }
 
-    await message.edit(view=GiveawayJoin(message.id))
+    await message.edit(view=GiveawayJoin(gw_id))
 
-    await ctx.respond("✅ Giveaway rozpoczęty!", ephemeral=True)
+    await ctx.respond(f"✅ Giveaway rozpoczęty! ID: {gw_id}", ephemeral=True)
 
     await asyncio.sleep(seconds)
 
-    if giveaways[message.id]["ended"]:
+    if giveaways[gw_id]["ended"]:
         return
 
-    users = giveaways[message.id]["users"]
+    users = giveaways[gw_id]["users"]
 
     if len(users) == 0:
-        await ctx.channel.send("❌ Nikt nie wziął udziału w giveaway.")
+
+        await ctx.channel.send("❌ Giveaway zakończony — brak uczestników.")
         return
 
-    winner_id = random.choice(users)
-    winner = await bot.fetch_user(winner_id)
+    winners = random.sample(users, min(len(users), giveaways[gw_id]["winners"]))
+
+    mentions = []
+
+    for uid in winners:
+
+        user = await bot.fetch_user(uid)
+
+        mentions.append(user.mention)
 
     await ctx.channel.send(
-        f"🎉 Gratulacje {winner.mention}! Wygrałeś **{nagroda}**!"
+        f"🎉 Giveaway zakończony!\n🏆 Zwycięzcy: {', '.join(mentions)}"
     )
 
-    giveaways[message.id]["ended"] = True
+    giveaways[gw_id]["ended"] = True
 
 
-@bot.slash_command(guild_ids=[GUILD_ID], description="Wylosuj nowego zwycięzcę giveaway")
+@bot.slash_command(guild_ids=[GUILD_ID], description="Lista aktywnych giveaway")
+async def giveaway_list(ctx: discord.ApplicationContext):
+
+    embed = discord.Embed(
+        title="🎉 Aktywne Giveaway",
+        color=discord.Color.blurple()
+    )
+
+    found = False
+
+    for gw_id, data in giveaways.items():
+
+        if not data["ended"]:
+
+            found = True
+
+            embed.add_field(
+                name=gw_id,
+                value=f"Nagroda: {data['reward']}\nUczestnicy: {len(data['users'])}",
+                inline=False
+            )
+
+    if not found:
+        embed.description = "Brak aktywnych giveaway."
+
+    await ctx.respond(embed=embed)
+
+
+@bot.slash_command(guild_ids=[GUILD_ID], description="Reroll giveaway")
 @commands.has_permissions(manage_guild=True)
 async def giveaway_reroll(
     ctx: discord.ApplicationContext,
-    message_id: Option(str, "ID wiadomości giveaway")
+    giveaway_id: Option(str, "ID giveaway np GW-1")
 ):
 
-    message_id = int(message_id)
+    if giveaway_id not in giveaways:
 
-    if message_id not in giveaways:
-        await ctx.respond("❌ Nie znaleziono giveaway.", ephemeral=True)
+        await ctx.respond("❌ Giveaway nie istnieje.", ephemeral=True)
         return
 
-    users = giveaways[message_id]["users"]
+    users = giveaways[giveaway_id]["users"]
 
     if len(users) == 0:
+
         await ctx.respond("❌ Brak uczestników.", ephemeral=True)
         return
 
@@ -426,39 +494,46 @@ async def giveaway_reroll(
     winner = await bot.fetch_user(winner_id)
 
     await ctx.channel.send(
-        f"🔄 Nowy zwycięzca giveaway: {winner.mention} 🎉"
+        f"🔄 Nowy zwycięzca: {winner.mention}"
     )
 
-    await ctx.respond("✅ Wylosowano nowego zwycięzcę.", ephemeral=True)
+    await ctx.respond("✅ Reroll wykonany.", ephemeral=True)
 
 
 @bot.slash_command(guild_ids=[GUILD_ID], description="Zakończ giveaway")
 @commands.has_permissions(manage_guild=True)
 async def giveaway_end(
     ctx: discord.ApplicationContext,
-    message_id: Option(str, "ID wiadomości giveaway")
+    giveaway_id: Option(str, "ID giveaway np GW-1")
 ):
 
-    message_id = int(message_id)
+    if giveaway_id not in giveaways:
 
-    if message_id not in giveaways:
-        await ctx.respond("❌ Nie znaleziono giveaway.", ephemeral=True)
+        await ctx.respond("❌ Giveaway nie istnieje.", ephemeral=True)
         return
 
-    users = giveaways[message_id]["users"]
+    users = giveaways[giveaway_id]["users"]
 
     if len(users) == 0:
+
         await ctx.respond("❌ Brak uczestników.", ephemeral=True)
         return
 
-    winner_id = random.choice(users)
-    winner = await bot.fetch_user(winner_id)
+    winners = random.sample(users, min(len(users), giveaways[giveaway_id]["winners"]))
+
+    mentions = []
+
+    for uid in winners:
+
+        user = await bot.fetch_user(uid)
+
+        mentions.append(user.mention)
 
     await ctx.channel.send(
-        f"🎉 Giveaway zakończony!\n🏆 Zwycięzca: {winner.mention}"
+        f"🎉 Giveaway zakończony!\n🏆 Zwycięzcy: {', '.join(mentions)}"
     )
 
-    giveaways[message_id]["ended"] = True
+    giveaways[giveaway_id]["ended"] = True
 
     await ctx.respond("✅ Giveaway zakończony.", ephemeral=True)
     
