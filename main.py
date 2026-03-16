@@ -307,14 +307,19 @@ giveaway_counter = 0
 
 
 def parse_time(time_str):
+    """
+    Zamienia string typu '1h30m10s' na liczbę sekund.
+    Obsługiwane jednostki: d, h, m, s
+    """
     time_regex = re.compile(r"(\d+)([smhd])")
-    matches = time_regex.findall(time_str)
+    matches = time_regex.findall(time_str.lower())
+
+    if not matches:
+        raise ValueError("Niepoprawny format czasu!")
 
     seconds = 0
     for value, unit in matches:
-
         value = int(value)
-
         if unit == "s":
             seconds += value
         elif unit == "m":
