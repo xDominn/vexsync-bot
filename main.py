@@ -205,6 +205,34 @@ async def setup_zamowienia(ctx: discord.ApplicationContext):
     await ctx.channel.send(embed=embed, view=StartZamowienia())
     await ctx.respond("✅ Panel zamówień wysłany", ephemeral=True)
 
+   # =========================================================
+# SETUP CENNIK
+# =========================================================
+@bot.slash_command(guild_ids=[GUILD_ID], description="SETUP: cennik usług")
+@commands.has_permissions(administrator=True)
+async def setup_cennik(ctx: discord.ApplicationContext):
+
+    embed = discord.Embed(
+        title="💰 Cennik usług",
+        color=discord.Color.red()
+    )
+
+    # Grafika
+    grafika_text = ""
+    for k, v in CENNIK_GRAFIKA.items():
+        grafika_text += f"• {k} — {v}\n"
+
+    # Montaż
+    montaz_text = ""
+    for k, v in CENNIK_MONTAZ.items():
+        montaz_text += f"• {k} — {v}\n"
+
+    embed.add_field(name="🎨 Grafika", value=grafika_text, inline=False)
+    embed.add_field(name="🎬 Montaż", value=montaz_text, inline=False)
+
+    await ctx.channel.send(embed=embed)
+    await ctx.respond("✅ Cennik wysłany!", ephemeral=True)
+
 # =========================================================
 # PURGE
 # =========================================================
