@@ -50,7 +50,7 @@ async def on_member_join(member):
         embed = discord.Embed(
             title="👋 Witaj!",
             description=f"Witaj {member.mention} na **{member.guild.name}**!",
-            color=discord.Color.green()
+            color=discord.Color.red()
         )
         await channel.send(embed=embed)
 
@@ -113,7 +113,7 @@ class ZamowienieModal(discord.ui.Modal):
         # embed zamówienia
         embed = discord.Embed(
             title="📦 Nowe zamówienie",
-            color=discord.Color.orange()
+            color=discord.Color.red()
         )
         embed.add_field(name="Klient", value=interaction.user.mention, inline=False)
         embed.add_field(name="Dział", value=self.dzial, inline=False)
@@ -200,7 +200,7 @@ async def setup_zamowienia(ctx: discord.ApplicationContext):
     embed = discord.Embed(
         title="📦 Zamówienia",
         description="Kliknij przycisk aby złożyć zamówienie",
-        color=discord.Color.blurple()
+        color=discord.Color.red()
     )
     await ctx.channel.send(embed=embed, view=StartZamowienia())
     await ctx.respond("✅ Panel zamówień wysłany", ephemeral=True)
@@ -395,7 +395,7 @@ async def giveaway_start(
     embed = discord.Embed(
         title="🎉 GIVEAWAY 🎉",
         description=opis,
-        color=discord.Color.gold()
+        color=discord.Color.red()
     )
 
     embed.add_field(name="🎁 Nagroda", value=nagroda)
