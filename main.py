@@ -765,6 +765,4 @@ async def opinia(ctx: discord.ApplicationContext, dzial: Option(str, "Jaka usłu
     await channel.send(embed=embed)
     await ctx.respond("✅ Twoja opinia została dodana!", ephemeral=True)
 
-    import os
-
-bot.run(os.getenv("TOKEN"))
+bot.run(TOKEN)
