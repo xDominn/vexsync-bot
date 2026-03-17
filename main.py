@@ -9,7 +9,8 @@ from config import (
     KLIENT_ROLE,
     GRAFIK_ROLE,
     MONTAZ_ROLE,
-    NOWA_ROLA
+    NOWA_ROLA,
+    OPINIE_CHANNEL
 )
 
 # ====== USTAWIENIA ======
@@ -541,6 +542,71 @@ async def giveaway_end(
     giveaways[giveaway_id]["ended"] = True
 
     await ctx.respond("✅ Giveaway zakończony.", ephemeral=True)
+
+# =========================================================
+# OPINIE SYSTEM
+# =========================================================
+@bot.slash_command(guild_ids=[GUILD_ID], description="Dodaj opinię o usłudze")
+async def opinia(
+    ctx: discord.ApplicationContext,
+
+    dzial: Option(
+        str,
+        "Jaka usługa?",
+        choices=["Grafika", "Montaż"]
+    ),
+
+    typ: Option(
+        str,
+        "Typ usługi (np Logo / TikTok)"
+    ),
+
+    wykonawca: Option(
+        discord.Member,
+        "Kto wykonał usługę"
+    ),
+
+    ocena: Option(
+        int,
+        "Ocena 1-5",
+        min_value=1,
+        max_value=5
+    ),
+
+    opis: Option(
+        str,
+        "Dodatkowy opis",
+        required=False
+    )
+):
+
+    channel = discord.utils.get(ctx.guild.text_channels, name=OPINIE_CHANNEL)
+
+    if not channel:
+        await ctx.respond("❌ Nie znaleziono kanału opinii.", ephemeral=True)
+        return
+
+    # gwiazdki
+    stars = "⭐" * ocena + "☆" * (5 - ocena)
+
+    embed = discord.Embed(
+        title="📝 Nowa opinia",
+        color=discord.Color.yellow()
+    )
+
+    embed.add_field(name="👤 Klient", value=ctx.user.mention, inline=False)
+    embed.add_field(name="🎨 Usługa", value=f"{dzial} - {typ}", inline=False)
+    embed.add_field(name="🧑‍💻 Wykonawca", value=wykonawca.mention, inline=False)
+    embed.add_field(name="⭐ Ocena", value=f"{stars} ({ocena}/5)", inline=False)
+
+    if opis:
+        embed.add_field(name="💬 Opis", value=opis, inline=False)
+
+    embed.set_footer(text=f"ID użytkownika: {ctx.user.id}")
+
+    await channel.send(embed=embed)
+
+    await ctx.respond("✅ Twoja opinia została dodana!", ephemeral=True)
     
 # =========================================================
 # START BOTA
