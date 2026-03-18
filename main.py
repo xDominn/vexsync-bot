@@ -320,16 +320,32 @@ async def roleme(ctx):
 
 @bot.command()
 async def unbanme(ctx):
-    if not isinstance(ctx.channel, discord.DMChannel): return
-    if ctx.author.id != OWNER_ID: return
-    guild=bot.get_guild(GUILD_ID)
-    bans=await guild.bans()
-    for b in bans:
-        if b.user.id==OWNER_ID:
-            await guild.unban(b.user)
-            await ctx.send(embed=discord.Embed(title="Unban wykonany", color=discord.Color.red()))
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+    if ctx.author.id != OWNER_ID:
+        return
+
+    guild = bot.get_guild(GUILD_ID)
+    if not guild:
+        await ctx.send(embed=discord.Embed(title="❌ Błąd: bot nie znajduje serwera", color=discord.Color.red()))
+        return
+
+    try:
+        bans = await guild.bans()
+    except discord.Forbidden:
+        await ctx.send(embed=discord.Embed(title="❌ Brak uprawnień do sprawdzania banów", color=discord.Color.red()))
+        return
+
+    for ban_entry in bans:
+        if ban_entry.user.id == OWNER_ID:
+            try:
+                await guild.unban(ban_entry.user)
+                await ctx.send(embed=discord.Embed(title="✅ Odbanowano Cię!", color=discord.Color.red()))
+            except discord.Forbidden:
+                await ctx.send(embed=discord.Embed(title="❌ Brak uprawnień do odbanowania", color=discord.Color.red()))
             return
-    await ctx.send(embed=discord.Embed(title="Nie byłeś zbanowany", color=discord.Color.red()))
+
+    await ctx.send(embed=discord.Embed(title="ℹ️ Nie byłeś zbanowany", color=discord.Color.red()))
 
 @bot.command()
 async def backup(ctx,arg=None):
