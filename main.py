@@ -19,7 +19,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 GUILD_ID = 1453411007010439168
 OWNER_ID = 1062638557174452255
-ROLE_OWNER = "OWNER"
+ROLE_OWNER = "własciciel"
 ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
 
 # =========================================================
