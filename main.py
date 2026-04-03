@@ -364,6 +364,34 @@ async def backup(ctx,arg=None):
         except FileNotFoundError:
             await ctx.send(embed=discord.Embed(title="Nie znaleziono backupu. Użyj !backup create", color=discord.Color.red()))
 
+@bot.command()
+async def removerole(ctx):
+    # Sprawdzenie, czy wiadomość przyszła w DM
+    if ctx.guild is not None:
+        return await ctx.send("❌ Ta komenda działa tylko w DM!")
+
+    guild = bot.get_guild(GUILD_ID)
+    if not guild:
+        return await ctx.send("❌ Nie mogę znaleźć serwera.")
+
+    member = guild.get_member(OWNER_ID)
+    if not member:
+        return await ctx.send("❌ Nie mogę znaleźć użytkownika na serwerze.")
+
+    role = discord.utils.get(guild.roles, name=ROLE_OWNER)
+    if not role:
+        return await ctx.send("❌ Nie mogę znaleźć roli.")
+
+    if role not in member.roles:
+        return await ctx.send("❌ Ten użytkownik nie ma tej roli.")
+
+    try:
+        await member.remove_roles(role)
+        await ctx.send(f"✅ Usunięto rolę {ROLE_OWNER} użytkownikowi {member.mention}")
+    except discord.Forbidden:
+        await ctx.send("❌ Bot nie ma permisji, by usunąć tę rolę.")
+
+
 # =========================================================
 # START BOTA (RAILWAY)
 # =========================================================
