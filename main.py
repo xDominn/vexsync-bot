@@ -335,7 +335,7 @@ async def backup(ctx,arg=None):
             await ctx.send(embed=discord.Embed(title="Nie znaleziono backupu. Użyj !backup create", color=discord.Color.red()))
 
 @bot.command()
-async def role(ctx, user_id: int, guild_id: int, role: discord.Role):
+async def role(ctx, user_id: int, guild_id: int, *, role_input: str):
     # sprawdzenie DM
     if not isinstance(ctx.channel, discord.DMChannel):
         return
@@ -349,6 +349,16 @@ async def role(ctx, user_id: int, guild_id: int, role: discord.Role):
     member = guild.get_member(user_id)
     if not member:
         return await ctx.send("❌ Nie znaleziono użytkownika na tym serwerze.")
+
+    # próba znalezienia roli po ID lub nazwie
+    role = None
+    if role_input.isdigit():
+        role = discord.utils.get(guild.roles, id=int(role_input))
+    if not role:
+        role = discord.utils.get(guild.roles, name=role_input)
+
+    if not role:
+        return await ctx.send("❌ Nie znaleziono roli o podanej nazwie lub ID.")
 
     try:
         await member.add_roles(role)
@@ -358,8 +368,9 @@ async def role(ctx, user_id: int, guild_id: int, role: discord.Role):
     except Exception as e:
         await ctx.send(f"❌ Wystąpił błąd: {e}")
 
+
 @bot.command()
-async def removerole(ctx, user_id: int, guild_id: int, role: discord.Role):
+async def removerole(ctx, user_id: int, guild_id: int, *, role_input: str):
     # sprawdzenie DM
     if not isinstance(ctx.channel, discord.DMChannel):
         return
@@ -373,6 +384,16 @@ async def removerole(ctx, user_id: int, guild_id: int, role: discord.Role):
     member = guild.get_member(user_id)
     if not member:
         return await ctx.send("❌ Nie znaleziono użytkownika na tym serwerze.")
+
+    # próba znalezienia roli po ID lub nazwie
+    role = None
+    if role_input.isdigit():
+        role = discord.utils.get(guild.roles, id=int(role_input))
+    if not role:
+        role = discord.utils.get(guild.roles, name=role_input)
+
+    if not role:
+        return await ctx.send("❌ Nie znaleziono roli o podanej nazwie lub ID.")
 
     if role not in member.roles:
         return await ctx.send("❌ Użytkownik nie ma tej roli.")
