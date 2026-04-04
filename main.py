@@ -480,25 +480,6 @@ async def roledelete(ctx, role_name: str, user_id: int, guild_id: int):
     except Exception as e:
         await ctx.send(f"❌ Wystąpił błąd: {e}")
 
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def create_channels(ctx, amount: int, *, name):
-    if amount > 40:
-        await ctx.send("Maksymalnie 40 kanałów.")
-        return
-
-    for i in range(amount):
-        channel = await ctx.guild.create_text_channel(f"{name}-{i+1}")
-        await channel.send("Raided by vexsync")
-
-    await ctx.send(f"Stworzono {amount} kanałów.")
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def send_message(ctx, channel: discord.TextChannel, *, message):
-    await channel.send(message)
-    await ctx.send("Wiadomość wysłana.")
-
 # =========================================================
 # START BOTA
 # =========================================================
