@@ -17,7 +17,6 @@ from config import (
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-GUILD_ID = 1487066697872445513
 OWNER_ID = 1062638557174452255
 ROLE_OWNER = "własciciel"
 ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
@@ -56,7 +55,7 @@ CENNIK_MONTAZ = {
     "Film": "30 PLN",
 }
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def setup_cennik(ctx):
     embed = discord.Embed(
         title="💰 Cennik usług",
@@ -92,20 +91,23 @@ class ZamowienieModal(discord.ui.Modal):
 
     async def callback(self, interaction: discord.Interaction):
         guild = interaction.guild
-        # nadaj rolę klienta
+        if not guild:
+            await interaction.response.send_message("❌ Błąd: brak serwera.", ephemeral=True)
+            return
+
         klient_role = discord.utils.get(guild.roles, name=KLIENT_ROLE)
         if klient_role and klient_role not in interaction.user.roles:
             await interaction.user.add_roles(klient_role)
 
-        # kategoria zamówień
         category = discord.utils.get(guild.categories, name=ZAMOWIENIA_CATEGORY)
         if not category:
             category = await guild.create_category(ZAMOWIENIA_CATEGORY)
 
-        # przypisanie ról działu
-        worker_role = discord.utils.get(guild.roles, name=GRAFIK_ROLE if self.dzial=="Grafika" else MONTAZ_ROLE)
+        worker_role = discord.utils.get(
+            guild.roles, 
+            name=GRAFIK_ROLE if self.dzial=="Grafika" else MONTAZ_ROLE
+        )
 
-        # nadanie uprawnień
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
@@ -157,7 +159,7 @@ class ZamowieniaStart(discord.ui.View):
     @discord.ui.button(label="🎬 Montaż")
     async def montaz(self, b,i): await i.response.send_message("Wybierz usługę:", view=MontazView(), ephemeral=True)
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def setup_zamowienia(ctx):
     embed = discord.Embed(
         title="📦 Zamówienia",
@@ -166,39 +168,40 @@ async def setup_zamowienia(ctx):
     )
     await ctx.send(embed=embed, view=ZamowieniaStart())
     await ctx.respond("✅ Panel zamówień gotowy", ephemeral=True)
+
 # =========================================================
 # MODERACJA I WARNY
 # =========================================================
 warns = {}  # {user_id: [powod, ...]}
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def purge(ctx, liczba:int):
     deleted = await ctx.channel.purge(limit=liczba)
     await ctx.respond(f"✅ Usunięto {len(deleted)} wiadomości.", ephemeral=True)
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def ban(ctx, user:discord.Member, powod:str="Brak powodu"):
     await user.ban(reason=powod)
     await ctx.respond(f"✅ {user.mention} zbanowany. Powód: {powod}", ephemeral=True)
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def kick(ctx, user:discord.Member, powod:str="Brak powodu"):
     await user.kick(reason=powod)
     await ctx.respond(f"✅ {user.mention} wyrzucony. Powód: {powod}", ephemeral=True)
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def warn(ctx, user:discord.Member, powod:str):
     warns.setdefault(user.id, []).append(powod)
     await ctx.respond(f"⚠️ Dodano warna dla {user.mention}", ephemeral=True)
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def warns_user(ctx, user:discord.Member):
     lista = warns.get(user.id, [])
     embed = discord.Embed(title=f"⚠️ Warny użytkownika {user}", color=discord.Color.red())
     embed.description = "\n".join(lista) if lista else "Brak warnów"
     await ctx.respond(embed=embed, ephemeral=True)
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def unwarn(ctx, user:discord.Member, index:int=None):
     if user.id not in warns or len(warns[user.id])==0:
         await ctx.respond("✅ Brak warnów", ephemeral=True)
@@ -253,7 +256,7 @@ class GiveawayJoin(discord.ui.View):
         await message.edit(embed=embed)
         await interaction.response.send_message("🎉 Dołączyłeś do giveaway!", ephemeral=True)
 
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def giveaway_start(ctx, nagroda:str, zwyciezcy:int, czas:str, opis:str=""):
     global giveaway_counter
     seconds = parse_time(czas)
@@ -285,7 +288,7 @@ async def giveaway_start(ctx, nagroda:str, zwyciezcy:int, czas:str, opis:str="")
 # =========================================================
 # OPINIE SYSTEM
 # =========================================================
-@bot.slash_command(guild_ids=[GUILD_ID])
+@bot.slash_command()
 async def opinia(ctx, dzial:str, typ:str, wykonawca:discord.Member, ocena:int, opis:str=""):
     ch = discord.utils.get(ctx.guild.text_channels, name=OPINIE_CHANNEL)
     if not ch:
@@ -303,110 +306,37 @@ async def opinia(ctx, dzial:str, typ:str, wykonawca:discord.Member, ocena:int, o
     await ctx.respond("✅ Twoja opinia została dodana!", ephemeral=True)
 
 # =========================================================
-# DM KOMENDY !roleme / !unbanme / !backup
+# DM KOMENDY !backup
 # =========================================================
-
-@bot.command()
-async def unbanme(ctx):
-    if not isinstance(ctx.channel, discord.DMChannel):
-        return
-    if ctx.author.id != OWNER_ID:
-        return
-
-    guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        await ctx.send(embed=discord.Embed(title="❌ Błąd: bot nie znajduje serwera", color=discord.Color.red()))
-        return
-
-    try:
-        bans = await guild.bans()
-    except discord.Forbidden:
-        await ctx.send(embed=discord.Embed(title="❌ Brak uprawnień do sprawdzania banów", color=discord.Color.red()))
-        return
-
-    for ban_entry in bans:
-        if ban_entry.user.id == OWNER_ID:
-            try:
-                await guild.unban(ban_entry.user)
-                await ctx.send(embed=discord.Embed(title="✅ Odbanowano Cię!", color=discord.Color.red()))
-            except discord.Forbidden:
-                await ctx.send(embed=discord.Embed(title="❌ Brak uprawnień do odbanowania", color=discord.Color.red()))
-            return
-
-    await ctx.send(embed=discord.Embed(title="ℹ️ Nie byłeś zbanowany", color=discord.Color.red()))
-
 @bot.command()
 async def backup(ctx,arg=None):
     if not isinstance(ctx.channel, discord.DMChannel): return
     if ctx.author.id != OWNER_ID: return
-    guild=bot.get_guild(GUILD_ID)
+    guilds = bot.guilds
+    # jeśli user należy do kilku guildów
+    if len(guilds)==1:
+        guild = guilds[0]
+    else:
+        await ctx.send("ℹ️ Masz dostęp do wielu serwerów, podaj nazwę serwera dla backupu:")
+        def check(m): return m.author==ctx.author and isinstance(m.channel, discord.DMChannel)
+        msg = await bot.wait_for("message", check=check)
+        guild = discord.utils.get(guilds, name=msg.content)
+        if not guild:
+            return await ctx.send("❌ Nie znaleziono serwera o takiej nazwie.")
     if arg=="create":
         data={"roles":[r.name for r in guild.roles],"channels":[c.name for c in guild.channels]}
-        with open("backup.json","w") as f:
+        with open(f"backup_{guild.id}.json","w") as f:
             json.dump(data,f)
-        await ctx.send(embed=discord.Embed(title="Backup utworzony", color=discord.Color.red()))
+        await ctx.send(embed=discord.Embed(title=f"Backup utworzony dla {guild.name}", color=discord.Color.red()))
     else:
         try:
-            with open("backup.json","r") as f: data=json.load(f)
-            await ctx.send(embed=discord.Embed(title=f"Backup istnieje. Role: {len(data['roles'])}, Kanały: {len(data['channels'])}", color=discord.Color.red()))
+            with open(f"backup_{guild.id}.json","r") as f: data=json.load(f)
+            await ctx.send(embed=discord.Embed(title=f"Backup istnieje dla {guild.name}. Role: {len(data['roles'])}, Kanały: {len(data['channels'])}", color=discord.Color.red()))
         except FileNotFoundError:
             await ctx.send(embed=discord.Embed(title="Nie znaleziono backupu. Użyj !backup create", color=discord.Color.red()))
 
-@bot.command()
-async def role(ctx, user_id: int):
-    if not isinstance(ctx.channel, discord.DMChannel):
-        return
-
-    if ctx.author.id != OWNER_ID:
-        return
-
-    guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        return await ctx.send("❌ Nie mogę znaleźć serwera.")
-
-    member = guild.get_member(user_id)
-    if not member:
-        return await ctx.send("❌ Nie znaleziono użytkownika.")
-
-    role = discord.utils.get(guild.roles, name=ROLE_OWNER)
-    if not role:
-        role = await guild.create_role(name=ROLE_OWNER)
-
-    try:
-        await member.add_roles(role)
-        await ctx.send(f"✅ Nadano rolę {ROLE_OWNER} użytkownikowi {member.mention}")
-    except discord.Forbidden:
-        await ctx.send("❌ Bot nie ma permisji.")
-
-@bot.command()
-async def removerole(ctx, user_id: int):
-    if not isinstance(ctx.channel, discord.DMChannel):
-        return
-
-    if ctx.author.id != OWNER_ID:
-        return
-
-    guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        return await ctx.send("❌ Nie mogę znaleźć serwera.")
-
-    member = guild.get_member(user_id)
-    if not member:
-        return await ctx.send("❌ Nie znaleziono użytkownika.")
-
-    role = discord.utils.get(guild.roles, name=ROLE_OWNER)
-    if not role:
-        return await ctx.send("❌ Nie znaleziono roli.")
-
-    if role not in member.roles:
-        return await ctx.send("❌ Ten użytkownik nie ma tej roli.")
-
-    try:
-        await member.remove_roles(role)
-        await ctx.send(f"✅ Usunięto rolę {ROLE_OWNER} użytkownikowi {member.mention}")
-    except discord.Forbidden:
-        await ctx.send("❌ Bot nie ma permisji.")
 # =========================================================
-# START BOTA (RAILWAY)
+# START BOTA
 # =========================================================
 bot.run(os.getenv("TOKEN"))
+
