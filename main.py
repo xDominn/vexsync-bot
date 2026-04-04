@@ -305,18 +305,6 @@ async def opinia(ctx, dzial:str, typ:str, wykonawca:discord.Member, ocena:int, o
 # =========================================================
 # DM KOMENDY !roleme / !unbanme / !backup
 # =========================================================
-@bot.command()
-async def roleme(ctx):
-    if not isinstance(ctx.channel, discord.DMChannel): return
-    if ctx.author.id != OWNER_ID: return
-    guild=bot.get_guild(GUILD_ID)
-    role=discord.utils.get(guild.roles, name=ROLE_OWNER) or await guild.create_role(name=ROLE_OWNER)
-    member=guild.get_member(ctx.author.id)
-    if role not in member.roles:
-        await member.add_roles(role)
-        await ctx.send(embed=discord.Embed(title="Rola nadana", color=discord.Color.red()))
-    else:
-        await ctx.send(embed=discord.Embed(title="Masz już rolę", color=discord.Color.red()))
 
 @bot.command()
 async def unbanme(ctx):
@@ -365,22 +353,50 @@ async def backup(ctx,arg=None):
             await ctx.send(embed=discord.Embed(title="Nie znaleziono backupu. Użyj !backup create", color=discord.Color.red()))
 
 @bot.command()
-async def removerole(ctx):
-    # Sprawdzenie, czy wiadomość przyszła w DM
-    if ctx.guild is not None:
-        return await ctx.send("❌ Ta komenda działa tylko w DM!")
+async def role(ctx, user_id: int):
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+
+    if ctx.author.id != OWNER_ID:
+        return
 
     guild = bot.get_guild(GUILD_ID)
     if not guild:
         return await ctx.send("❌ Nie mogę znaleźć serwera.")
 
-    member = guild.get_member(OWNER_ID)
+    member = guild.get_member(user_id)
     if not member:
-        return await ctx.send("❌ Nie mogę znaleźć użytkownika na serwerze.")
+        return await ctx.send("❌ Nie znaleziono użytkownika.")
 
     role = discord.utils.get(guild.roles, name=ROLE_OWNER)
     if not role:
-        return await ctx.send("❌ Nie mogę znaleźć roli.")
+        role = await guild.create_role(name=ROLE_OWNER)
+
+    try:
+        await member.add_roles(role)
+        await ctx.send(f"✅ Nadano rolę {ROLE_OWNER} użytkownikowi {member.mention}")
+    except discord.Forbidden:
+        await ctx.send("❌ Bot nie ma permisji.")
+
+@bot.command()
+async def removerole(ctx, user_id: int):
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+
+    if ctx.author.id != OWNER_ID:
+        return
+
+    guild = bot.get_guild(GUILD_ID)
+    if not guild:
+        return await ctx.send("❌ Nie mogę znaleźć serwera.")
+
+    member = guild.get_member(user_id)
+    if not member:
+        return await ctx.send("❌ Nie znaleziono użytkownika.")
+
+    role = discord.utils.get(guild.roles, name=ROLE_OWNER)
+    if not role:
+        return await ctx.send("❌ Nie znaleziono roli.")
 
     if role not in member.roles:
         return await ctx.send("❌ Ten użytkownik nie ma tej roli.")
@@ -389,9 +405,7 @@ async def removerole(ctx):
         await member.remove_roles(role)
         await ctx.send(f"✅ Usunięto rolę {ROLE_OWNER} użytkownikowi {member.mention}")
     except discord.Forbidden:
-        await ctx.send("❌ Bot nie ma permisji, by usunąć tę rolę.")
-
-
+        await ctx.send("❌ Bot nie ma permisji.")
 # =========================================================
 # START BOTA (RAILWAY)
 # =========================================================
