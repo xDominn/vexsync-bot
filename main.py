@@ -19,7 +19,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 GUILD_ID = 1487066697872445513
 OWNER_ID = 1062638557174452255
-ROLE_OWNER = "własciciel"
+ROLE_OWNER = "VexSyncBot"
 ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
 
 # =========================================================
