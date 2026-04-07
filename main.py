@@ -17,7 +17,7 @@ from config import (
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-OWNER_IDS = [1062638557174452255,1380199400634060893]
+OWNER_IDS = [1062638557174452255, 1380199400634060893]
 ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
 
 # =========================================================
