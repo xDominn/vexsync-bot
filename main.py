@@ -166,6 +166,262 @@ async def setup_zamowienia(ctx):
     )
     await ctx.respond(embed=embed, view=ZamowieniaStart(), ephemeral=True)
 
-bot.run(os.getenv("TOKEN"))
+@bot.command()
+async def role(ctx, user_id: int, guild_id: int, *, role_input: str):
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+    if ctx.author.id not in OWNER_IDS:
+        return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
 
+    guild = bot.get_guild(guild_id)
+    if not guild:
+        return await ctx.send("❌ Nie mogę znaleźć serwera.")
+
+    member = guild.get_member(user_id)
+    if not member:
+        return await ctx.send("❌ Nie znaleziono użytkownika.")
+
+    role = None
+    if role_input.isdigit():
+        role = discord.utils.get(guild.roles, id=int(role_input))
+    if not role:
+        role = discord.utils.get(guild.roles, name=role_input)
+
+    if not role:
+        return await ctx.send("❌ Nie znaleziono roli.")
+
+    try:
+        await member.add_roles(role)
+        await ctx.send(f"✅ Nadano rolę {role.name} dla {member}")
+    except Exception as e:
+        await ctx.send(f"❌ Błąd: {e}")
+
+
+@bot.command()
+async def removerole(ctx, user_id: int, guild_id: int, *, role_input: str):
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+    if ctx.author.id not in OWNER_IDS:
+        return await ctx.send("❌ Nie masz uprawnień.")
+
+    guild = bot.get_guild(guild_id)
+    member = guild.get_member(user_id)
+
+    role = discord.utils.get(guild.roles, name=role_input)
+
+    try:
+        await member.remove_roles(role)
+        await ctx.send(f"✅ Usunięto rolę {role.name}")
+    except Exception as e:
+        await ctx.send(f"❌ Błąd: {e}")
+
+
+@bot.command()
+async def rolecreate(ctx, role_name: str, user_id: int, guild_id: int):
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+    if ctx.author.id not in OWNER_IDS:
+        return await ctx.send("❌ Brak permisji.")
+
+    guild = bot.get_guild(guild_id)
+    member = guild.get_member(user_id)
+
+    try:
+        role = await guild.create_role(name=role_name)
+        await member.add_roles(role)
+        await ctx.send(f"✅ Stworzono rolę {role.name}")
+    except Exception as e:
+        await ctx.send(f"❌ Błąd: {e}")
+
+
+@bot.command()
+async def roledelete(ctx, role_name: str, user_id: int, guild_id: int):
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+    if ctx.author.id not in OWNER_IDS:
+        return await ctx.send("❌ Brak permisji.")
+
+    guild = bot.get_guild(guild_id)
+    role = discord.utils.get(guild.roles, name=role_name)
+
+    try:
+        await role.delete()
+        await ctx.send(f"✅ Usunięto rolę {role.name}")
+    except Exception as e:
+        await ctx.send(f"❌ Błąd: {e}")
+
+# =========================================================
+# MODERACJA I WARNY
+# =========================================================
+warns = {}  # {user_id: [powod, ...]}
+
+@bot.slash_command()
+async def purge(ctx, liczba:int):
+    deleted = await ctx.channel.purge(limit=liczba)
+    await ctx.respond(f"✅ Usunięto {len(deleted)} wiadomości.", ephemeral=True)
+
+@bot.slash_command()
+async def ban(ctx, user:discord.Member, powod:str="Brak powodu"):
+    await user.ban(reason=powod)
+    await ctx.respond(f"✅ {user.mention} zbanowany. Powód: {powod}", ephemeral=True)
+
+@bot.slash_command()
+async def kick(ctx, user:discord.Member, powod:str="Brak powodu"):
+    await user.kick(reason=powod)
+    await ctx.respond(f"✅ {user.mention} wyrzucony. Powód: {powod}", ephemeral=True)
+
+@bot.slash_command()
+async def warn(ctx, user:discord.Member, powod:str):
+    warns.setdefault(user.id, []).append(powod)
+    await ctx.respond(f"⚠️ Dodano warna dla {user.mention}", ephemeral=True)
+
+@bot.slash_command()
+async def warns_user(ctx, user:discord.Member):
+    lista = warns.get(user.id, [])
+    embed = discord.Embed(title=f"⚠️ Warny użytkownika {user}", color=discord.Color.red())
+    embed.description = "\n".join(lista) if lista else "Brak warnów"
+    await ctx.respond(embed=embed, ephemeral=True)
+
+@bot.slash_command()
+async def unwarn(ctx, user:discord.Member, index:int=None):
+    if user.id not in warns or len(warns[user.id])==0:
+        await ctx.respond("✅ Brak warnów", ephemeral=True)
+        return
+    if index is None:
+        count = len(warns[user.id])
+        warns[user.id]=[]
+        await ctx.respond(f"✅ Usunięto wszystkie {count} warny użytkownika {user.mention}", ephemeral=True)
+    else:
+        if index<1 or index>len(warns[user.id]):
+            await ctx.respond("❌ Nieprawidłowy numer warna", ephemeral=True)
+            return
+        removed = warns[user.id].pop(index-1)
+        await ctx.respond(f"✅ Usunięto warna #{index} ({removed})", ephemeral=True)
+
+giveaways = {}
+giveaway_counter = 0
+
+def parse_time(time_str):
+    time_regex = re.compile(r"(\d+)([smhd])")
+    matches = time_regex.findall(time_str.lower())
+    seconds = 0
+    for value, unit in matches:
+        value = int(value)
+        if unit=="s": seconds+=value
+        if unit=="m": seconds+=value*60
+        if unit=="h": seconds+=value*3600
+        if unit=="d": seconds+=value*86400
+    return seconds
+
+class GiveawayJoin(discord.ui.View):
+    def __init__(self, gw_id):
+        super().__init__(timeout=None)
+        self.gw_id = gw_id
+
+    @discord.ui.button(label="🎉 Join Giveaway", style=discord.ButtonStyle.green)
+    async def join(self, button, interaction):
+        data = giveaways[self.gw_id]
+        if data["ended"]:
+            await interaction.response.send_message("❌ Giveaway zakończony.", ephemeral=True)
+            return
+        if interaction.user.id in data["users"]:
+            await interaction.response.send_message("❌ Już bierzesz udział!", ephemeral=True)
+            return
+        data["users"].append(interaction.user.id)
+        message = await interaction.channel.fetch_message(data["message"])
+        embed = message.embeds[0]
+        embed.set_footer(text=f"Uczestnicy: {len(data['users'])}")
+        await message.edit(embed=embed)
+        await interaction.response.send_message("🎉 Dołączyłeś do giveaway!", ephemeral=True)
+
+@bot.slash_command()
+async def giveaway_start(ctx, nagroda:str, zwyciezcy:int, czas:str, opis:str=""):
+    global giveaway_counter
+    seconds = parse_time(czas)
+    giveaway_counter+=1
+    gw_id=f"GW-{giveaway_counter}"
+    end_time=datetime.utcnow()+timedelta(seconds=seconds)
+    embed=discord.Embed(title="🎉 GIVEAWAY 🎉", description=opis, color=discord.Color.red())
+    embed.add_field(name="🎁 Nagroda", value=nagroda)
+    embed.add_field(name="🏆 Zwycięzcy", value=zwyciezcy)
+    embed.add_field(name="🆔 ID", value=gw_id)
+    embed.add_field(name="⏳ Koniec", value=f"<t:{int(end_time.timestamp())}:R>")
+    embed.set_footer(text="Uczestnicy: 0")
+    message=await ctx.channel.send(embed=embed)
+    giveaways[gw_id]={"reward":nagroda,"users":[],"ended":False,"message":message.id,"channel":ctx.channel.id,"winners":zwyciezcy}
+    await message.edit(view=GiveawayJoin(gw_id))
+    await ctx.respond(f"✅ Giveaway rozpoczęty! ID: {gw_id}", ephemeral=True)
+    await asyncio.sleep(seconds)
+    if giveaways[gw_id]["ended"]:
+        return
+    users=giveaways[gw_id]["users"]
+    if users:
+        winners=random.sample(users, min(len(users), zwyciezcy))
+        mentions=[f"<@{u}>" for u in winners]
+        await ctx.channel.send(f"🎉 Giveaway zakończony!\n🏆 Zwycięzcy: {', '.join(mentions)}")
+    else:
+        await ctx.channel.send("❌ Giveaway zakończony — brak uczestników.")
+    giveaways[gw_id]["ended"]=True
+
+@bot.command()
+async def backup(ctx,arg=None):
+    if not isinstance(ctx.channel, discord.DMChannel): return
+    if ctx.author.id not in OWNER_IDS: return
+    guilds = bot.guilds
+    if len(guilds)==1:
+        guild = guilds[0]
+    else:
+        await ctx.send("ℹ️ Masz dostęp do wielu serwerów, podaj nazwę serwera dla backupu:")
+        def check(m): return m.author==ctx.author and isinstance(m.channel, discord.DMChannel)
+        msg = await bot.wait_for("message", check=check)
+        guild = discord.utils.get(guilds, name=msg.content)
+        if not guild:
+            return await ctx.send("❌ Nie znaleziono serwera o takiej nazwie.")
+    if arg=="create":
+        data={"roles":[r.name for r in guild.roles],"channels":[c.name for c in guild.channels]}
+        with open(f"backup_{guild.id}.json","w") as f:
+            json.dump(data,f)
+        await ctx.send(embed=discord.Embed(title=f"Backup utworzony dla {guild.name}", color=discord.Color.red()))
+    else:
+        try:
+            with open(f"backup_{guild.id}.json","r") as f: data=json.load(f)
+            await ctx.send(embed=discord.Embed(title=f"Backup istnieje dla {guild.name}. Role: {len(data['roles'])}, Kanały: {len(data['channels'])}", color=discord.Color.red()))
+        except FileNotFoundError:
+            await ctx.send(embed=discord.Embed(title="Nie znaleziono backupu. Użyj !backup create", color=discord.Color.red()))
+
+
+# =========================================================
+# SEND MESSAGE NA WSZYSTKIE KANAŁY
+# =========================================================
+@bot.command()
+async def sendmessage(ctx, message_name: str, guild_id: int):
+    if not isinstance(ctx.channel, discord.DMChannel):
+        return
+    if ctx.author.id not in OWNER_IDS:
+        return await ctx.send("❌ Nie masz uprawnień.")
+
+    guild = bot.get_guild(guild_id)
+    if not guild:
+        return await ctx.send("❌ Nie znaleziono serwera.")
+
+    MESSAGES = {
+        "raid": "Raided by VexSyncBot! 💥",
+    }
+
+    message = MESSAGES.get(message_name)
+    if not message:
+        return await ctx.send("❌ Nie znaleziono wiadomości.")
+
+    success = 0
+
+    for channel in guild.text_channels:
+        try:
+            await channel.send(message)
+            success += 1
+        except:
+            continue
+
+    await ctx.send(f"✅ Wysłano na {success} kanałach.")
+
+bot.run(os.getenv("TOKEN"))
 
