@@ -56,6 +56,9 @@ CENNIK_MONTAZ = {
 
 @bot.slash_command()
 async def setup_cennik(ctx):
+    if ctx.user.id not in OWNER_IDS:
+        await ctx.respond("❌ Nie masz uprawnień do użycia tej komendy.", ephemeral=True)
+        return
     embed = discord.Embed(
         title="💰 Cennik usług",
         description="💳 Płatność tylko PaySafeCard",
@@ -71,7 +74,8 @@ async def setup_cennik(ctx):
         value="\n".join([f"{k} — {v}" for k,v in CENNIK_MONTAZ.items()]),
         inline=False
     )
-    await ctx.respond(embed=embed, ephemeral=True)
+
+    await ctx.send(embed=embed)
 
 # =========================================================
 # ZAMÓWIENIA MODAL
@@ -85,6 +89,7 @@ class ZamowienieModal(discord.ui.Modal):
             label="Opisz szczegóły zamówienia",
             style=discord.InputTextStyle.long
         )
+        
         self.add_item(self.opis)
 
     async def callback(self, interaction: discord.Interaction):
@@ -129,8 +134,15 @@ class ZamowienieModal(discord.ui.Modal):
         embed.add_field(name="💰 Cena", value=cena, inline=False)
         embed.add_field(name="📝 Opis", value=self.opis.value, inline=False)
 
-        await channel.send(embed=embed)
+        await channel.send(embed=embed, view=CloseTicketView())
         await interaction.response.send_message("✅ Zamówienie utworzone!", ephemeral=True)
+
+class CloseTicketView(discord.ui.View):
+    @discord.ui.button(label="🔒 Zamknij zamówienie", style=discord.ButtonStyle.red)
+    async def close(self, button, interaction):
+        await interaction.response.send_message("⏳ Zamykanie kanału...", ephemeral=True)
+        await asyncio.sleep(2)
+        await interaction.channel.delete()
 
 # =========================================================
 # VIEWS
@@ -159,6 +171,9 @@ class ZamowieniaStart(discord.ui.View):
 
 @bot.slash_command()
 async def setup_zamowienia(ctx):
+    if ctx.user.id not in OWNER_IDS:
+        await ctx.respond("❌ Nie masz uprawnień do użycia tej komendy.", ephemeral=True)
+        return
     embed = discord.Embed(
         title="📦 Zamówienia",
         description="Kliknij przycisk aby złożyć zamówienie",
