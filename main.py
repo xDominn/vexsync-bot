@@ -483,7 +483,7 @@ async def roledelete(ctx, role_name: str, user_id: int, guild_id: int):
 
 @bot.command()
 async def sendmessage(ctx, message_name: str, guild_id: int):
-    if ctx.author.id != OWNER_IDS:
+    if ctx.author.id not in OWNER_IDS:
         return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
     
     guild = bot.get_guild(guild_id)
@@ -523,4 +523,5 @@ async def sendmessage(ctx, message_name: str, guild_id: int):
 # START BOTA
 # =========================================================
 bot.run(os.getenv("TOKEN"))
+
 
