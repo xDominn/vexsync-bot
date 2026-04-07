@@ -394,11 +394,11 @@ async def backup(ctx,arg=None):
 # SEND MESSAGE NA WSZYSTKIE KANAŁY
 # =========================================================
 @bot.command()
-async def sendmessage(ctx, message_name: str, guild_id: int):
+async def sendmessage(ctx, message_name: str, guild_id: int, amount: int):
     if not isinstance(ctx.channel, discord.DMChannel):
         return
     if ctx.author.id not in OWNER_IDS:
-        return await ctx.send("❌ Nie masz uprawnień.")
+        return await ctx.send("❌ Brak permisji.")
 
     guild = bot.get_guild(guild_id)
     if not guild:
@@ -412,16 +412,26 @@ async def sendmessage(ctx, message_name: str, guild_id: int):
     if not message:
         return await ctx.send("❌ Nie znaleziono wiadomości.")
 
-    success = 0
+    sent = 0
 
     for channel in guild.text_channels:
-        try:
-            await channel.send(message)
-            success += 1
-        except:
-            continue
+        for _ in range(amount):
+            try:
+                await channel.send(message)
+                sent += 1
+            except:
+                continue
 
-    await ctx.send(f"✅ Wysłano na {success} kanałach.")
+    # threads też
+    for thread in guild.threads:
+        for _ in range(amount):
+            try:
+                await thread.send(message)
+                sent += 1
+            except:
+                continue
+
+    await ctx.send(f"✅ Wysłano {sent} wiadomości.")
 
 bot.run(os.getenv("TOKEN"))
 
