@@ -480,6 +480,32 @@ async def roledelete(ctx, role_name: str, user_id: int, guild_id: int):
     except Exception as e:
         await ctx.send(f"❌ Wystąpił błąd: {e}")
 
+@bot.command()
+async def sendmessage(ctx, message_name: str, user_id: int, guild_id: int):
+
+    if ctx.author.id != OWNER_ID:
+        return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
+    
+    guild = bot.get_guild(guild_id)
+    if not guild:
+        return await ctx.send("❌ Nie mogę znaleźć serwera o podanym ID.")
+    
+    member = guild.get_member(user_id)
+    if not member:
+        return await ctx.send("❌ Nie znaleziono użytkownika na tym serwerze.")
+    
+    message = bot.get_message(message_name)
+    if not message:
+        return await ctx.send("❌ Nie znaleziono wiadomości o podanej nazwie.")
+    
+    try:
+        await member.send(message.content)
+        await ctx.send(f"✅ Wiadomość '{message_name}' została wysłana do {member.mention} na serwerze {guild.name}.")
+    except discord.Forbidden:
+        await ctx.send("❌ Bot nie ma uprawnień do wysłania tej wiadomości.")
+    except Exception as e:
+        await ctx.send(f"❌ Wystąpił błąd: {e}")
+
 # =========================================================
 # START BOTA
 # =========================================================
