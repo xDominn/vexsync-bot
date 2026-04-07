@@ -480,14 +480,8 @@ async def roledelete(ctx, role_name: str, user_id: int, guild_id: int):
     except Exception as e:
         await ctx.send(f"❌ Wystąpił błąd: {e}")
         
-MESSAGES = {
-    "test": "To jest testowa wiadomość",
-    "hej": "Hej! Jak się masz?"
-}
-
 @bot.command()
-async def sendmessage(ctx, message_name: str, user_id: int, guild_id: int):
-
+async def sendmessage(ctx, message_name: str, guild_id: int):
     if ctx.author.id != OWNER_ID:
         return await ctx.send("❌ Nie masz uprawnień do używania tej komendy.")
     
@@ -495,21 +489,31 @@ async def sendmessage(ctx, message_name: str, user_id: int, guild_id: int):
     if not guild:
         return await ctx.send("❌ Nie mogę znaleźć serwera o podanym ID.")
     
-    member = guild.get_member(user_id)
-    if not member:
-        return await ctx.send("❌ Nie znaleziono użytkownika na tym serwerze.")
-    
+    # Twoje wiadomości zapisane w słowniku
+    MESSAGES = {
+        "test": "To jest testowa wiadomość",
+        "hej": "Hej! Jak się masz?"
+    }
+
     message = MESSAGES.get(message_name)
     if not message:
         return await ctx.send("❌ Nie znaleziono wiadomości o podanej nazwie.")
-    
-    try:
-        await member.send(message)
-        await ctx.send(f"✅ Wiadomość '{message_name}' została wysłana do {member.mention} na serwerze {guild.name}.")
-    except discord.Forbidden:
-        await ctx.send("❌ Bot nie ma uprawnień do wysłania tej wiadomości.")
-    except Exception as e:
-        await ctx.send(f"❌ Wystąpił błąd: {e}")
+
+    sent_channels = []
+    for channel in guild.text_channels:
+        try:
+            await channel.send(message)
+            sent_channels.append(channel.name)
+        except discord.Forbidden:
+            # Bot nie ma uprawnień w tym kanale, ignorujemy
+            continue
+        except Exception as e:
+            await ctx.send(f"❌ Błąd podczas wysyłania do {channel.name}: {e}")
+
+    if sent_channels:
+        await ctx.send(f"✅ Wiadomość '{message_name}' została wysłana na kanałach: {', '.join(sent_channels)}")
+    else:
+        await ctx.send("❌ Nie udało się wysłać wiadomości na żadnym kanale.")
 # =========================================================
 # START BOTA
 # =========================================================
